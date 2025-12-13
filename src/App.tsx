@@ -1,7 +1,7 @@
-import { ComponentExample } from "@/components/component-example";
+import { WebGLCanvas } from "@/components/canvas";
 
-export function App() {
-  return <ComponentExample />;
+function App() {
+  return <WebGLCanvas />;
 }
 
 export default App;
