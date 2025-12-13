@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getRotatedCorners, getShapesInBox, hitTestResizeHandle, hitTestShape, WebGLRenderer } from "@/core";
+import { getRotatedCorners, hitTestResizeHandle, hitTestShape, WebGLRenderer } from "@/core";
 import { useCanvasControls, useCanvasInteractions } from "@/hooks";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement, Shape } from "@/types";
@@ -154,19 +154,15 @@ export function WebGLCanvas() {
   const handleWheel = useCallback(
     (e: WheelEvent) => {
       e.preventDefault();
-      if (e.ctrlKey || e.metaKey) {
-        actions.zoomIn();
-        return;
-      }
       if (!containerRef.current) return;
       handlers.handleWheel(e, containerRef.current.getBoundingClientRect());
     },
-    [handlers, actions],
+    [handlers],
   );
 
   const onMouseUp = useCallback(() => {
-    handleMouseUp((box) => getShapesInBox(box, elements));
-  }, [handleMouseUp, elements]);
+    handleMouseUp();
+  }, [handleMouseUp]);
 
   // Setup event listeners
   useEffect(() => {
@@ -334,6 +330,7 @@ export function WebGLCanvas() {
             height: 0,
           },
           rotation: angle,
+          isLine: true,
         };
       }
 
@@ -341,6 +338,7 @@ export function WebGLCanvas() {
       return {
         bounds,
         rotation: element.rotation,
+        isLine: false,
       };
     }
 
@@ -364,6 +362,7 @@ export function WebGLCanvas() {
     return {
       bounds: { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
       rotation: 0,
+      isLine: false,
     };
   }, [selectedIds, elements]);
 
@@ -374,7 +373,12 @@ export function WebGLCanvas() {
       </CanvasContextMenu>
 
       {selectionInfo && (
-        <DimensionLabel bounds={selectionInfo.bounds} transform={transform} rotation={selectionInfo.rotation} />
+        <DimensionLabel
+          bounds={selectionInfo.bounds}
+          transform={transform}
+          rotation={selectionInfo.rotation}
+          isLine={selectionInfo.isLine}
+        />
       )}
 
       <CanvasMenubar />

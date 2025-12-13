@@ -13,6 +13,7 @@ import { useCanvasStore } from "@/store";
 export function CanvasMenubar() {
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const elements = useCanvasStore((s) => s.elements);
+  const transform = useCanvasStore((s) => s.transform); // Added
   const deleteSelected = useCanvasStore((s) => s.deleteSelected);
   const duplicateSelected = useCanvasStore((s) => s.duplicateSelected);
   const selectAll = useCanvasStore((s) => s.selectAll);
@@ -24,15 +25,22 @@ export function CanvasMenubar() {
   const groupSelected = useCanvasStore((s) => s.groupSelected);
   const ungroupSelected = useCanvasStore((s) => s.ungroupSelected);
 
+  const getCenter = () => {
+    const centerX = (window.innerWidth / 2 - transform.x) / transform.scale;
+    const centerY = (window.innerHeight / 2 - transform.y) / transform.scale;
+    return { x: centerX, y: centerY };
+  };
+
   const handleAddRect = () => {
+    const center = getCenter();
     addElement({
       id: crypto.randomUUID(),
       type: "rect",
       name: `Rectangle ${elements.filter((e) => e.type === "rect").length + 1}`,
-      x: 100 + Math.random() * 200,
-      y: 100 + Math.random() * 200,
-      width: 100 + Math.random() * 100,
-      height: 80 + Math.random() * 80,
+      x: center.x - 50,
+      y: center.y - 40,
+      width: 100,
+      height: 80,
       rotation: 0,
       fill: getRandomShapeColorCSS(),
       stroke: null,
@@ -41,14 +49,15 @@ export function CanvasMenubar() {
   };
 
   const handleAddEllipse = () => {
+    const center = getCenter();
     addElement({
       id: crypto.randomUUID(),
       type: "ellipse",
       name: `Ellipse ${elements.filter((e) => e.type === "ellipse").length + 1}`,
-      cx: 200 + Math.random() * 200,
-      cy: 200 + Math.random() * 200,
-      rx: 50 + Math.random() * 50,
-      ry: 40 + Math.random() * 40,
+      cx: center.x,
+      cy: center.y,
+      rx: 50,
+      ry: 40,
       rotation: 0,
       fill: getRandomShapeColorCSS(),
       stroke: null,
@@ -57,16 +66,15 @@ export function CanvasMenubar() {
   };
 
   const handleAddLine = () => {
-    const x1 = 100 + Math.random() * 200;
-    const y1 = 100 + Math.random() * 200;
+    const center = getCenter();
     addElement({
       id: crypto.randomUUID(),
       type: "line",
       name: `Line ${elements.filter((e) => e.type === "line").length + 1}`,
-      x1,
-      y1,
-      x2: x1 + 100 + Math.random() * 100,
-      y2: y1 + Math.random() * 100 - 50,
+      x1: center.x - 50,
+      y1: center.y,
+      x2: center.x + 50,
+      y2: center.y,
       rotation: 0,
       fill: null,
       stroke: { color: getRandomShapeColorCSS(), width: 2 },

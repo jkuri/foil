@@ -327,6 +327,48 @@ export function calculateBoundingBox(elements: CanvasElement[]): BoundingBox | n
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
+function lineIntersectsBox(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+): boolean {
+  // Check if either point is inside
+  if (x1 >= minX && x1 <= maxX && y1 >= minY && y1 <= maxY) return true;
+  if (x2 >= minX && x2 <= maxX && y2 >= minY && y2 <= maxY) return true;
+
+  // Check intersection with box edges
+  // Left edge (x=minX)
+  if (x2 !== x1) {
+    let t = (minX - x1) / (x2 - x1);
+    let y = y1 + t * (y2 - y1);
+    if (t >= 0 && t <= 1 && y >= minY && y <= maxY) return true;
+
+    // Right edge (x=maxX)
+    t = (maxX - x1) / (x2 - x1);
+    y = y1 + t * (y2 - y1);
+    if (t >= 0 && t <= 1 && y >= minY && y <= maxY) return true;
+  }
+
+  // Top edge (y=minY)
+  if (y2 !== y1) {
+    let t = (minY - y1) / (y2 - y1);
+    let x = x1 + t * (x2 - x1);
+    if (t >= 0 && t <= 1 && x >= minX && x <= maxX) return true;
+
+    // Bottom edge (y=maxY)
+    t = (maxY - y1) / (y2 - y1);
+    x = x1 + t * (x2 - x1);
+    if (t >= 0 && t <= 1 && x >= minX && x <= maxX) return true;
+  }
+
+  return false;
+}
+
 export function getShapesInBox(
   box: { startX: number; startY: number; endX: number; endY: number },
   elements: CanvasElement[],
@@ -338,12 +380,18 @@ export function getShapesInBox(
 
   const boxWidth = maxX - minX;
   const boxHeight = maxY - minY;
-  if (boxWidth < 3 && boxHeight < 3) return [];
+  if (boxWidth < 1 && boxHeight < 1) return [];
 
   return elements.filter((element) => {
     if (element.visible === false) return false;
     if (element.type === "group") return false;
     if (element.parentId) return false; // Don't select children directly, select parent
+
+    // Special case for lines: check intersection with box
+    if (element.type === "line") {
+      const line = element as LineElement;
+      return lineIntersectsBox(line.x1, line.y1, line.x2, line.y2, minX, minY, maxX, maxY);
+    }
 
     const shape = element as Shape;
     const corners = getRotatedCorners(shape);

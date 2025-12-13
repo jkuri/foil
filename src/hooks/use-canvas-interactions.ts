@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef } from "react";
-import { calculateBoundingBox, hitTestBoundsHandle, hitTestRotatedElementHandle } from "@/core";
+import { calculateBoundingBox, getShapesInBox, hitTestBoundsHandle, hitTestRotatedElementHandle } from "@/core";
 import { useCanvasStore } from "@/store";
 import type { BoundingBox, CanvasElement, ResizeHandle, Shape } from "@/types";
 
@@ -199,6 +199,7 @@ export function useCanvasInteractions({
         y1?: number;
         x2?: number;
         y2?: number;
+        bounds?: { x: number; y: number; width: number; height: number; rotation?: number };
       }
     >;
     isSingleRotatedElement: boolean;
@@ -233,6 +234,7 @@ export function useCanvasInteractions({
   } | null>(null);
 
   const marqueeStartRef = useRef<{ worldX: number; worldY: number } | null>(null);
+  const initialSelectedIdsRef = useRef<string[]>([]);
   const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Get the rotation of the currently selected element(s) for cursor
@@ -419,6 +421,11 @@ export function useCanvasInteractions({
                     cy?: number;
                     rx?: number;
                     ry?: number;
+                    x1?: number;
+                    y1?: number;
+                    x2?: number;
+                    y2?: number;
+                    bounds?: { x: number; y: number; width: number; height: number; rotation?: number };
                   }
                 >();
                 for (const element of selectedElements) {
@@ -504,7 +511,12 @@ export function useCanvasInteractions({
             }
           }
         } else {
-          if (!e.shiftKey) setSelectedIds([]);
+          if (!e.shiftKey) {
+            setSelectedIds([]);
+            initialSelectedIdsRef.current = [];
+          } else {
+            initialSelectedIdsRef.current = [...selectedIds];
+          }
           setIsMarqueeSelecting(true);
           marqueeStartRef.current = { worldX: world.x, worldY: world.y };
           lastMousePosRef.current = { x: e.clientX, y: e.clientY };
@@ -734,19 +746,48 @@ export function useCanvasInteractions({
           }
 
           for (const [id, original] of originalElements) {
-            if (original.type !== "rect") continue; // Only resize rects for now
-
             const relX = (original.x - originalBounds.x) / originalBounds.width;
             const relY = (original.y - originalBounds.y) / originalBounds.height;
             const relW = original.width / originalBounds.width;
             const relH = original.height / originalBounds.height;
 
-            updateElement(id, {
-              x: newBoundsX + relX * newBoundsWidth,
-              y: newBoundsY + relY * newBoundsHeight,
-              width: Math.max(10, relW * newBoundsWidth),
-              height: Math.max(10, relH * newBoundsHeight),
-            });
+            const newX = newBoundsX + relX * newBoundsWidth;
+            const newY = newBoundsY + relY * newBoundsHeight;
+            const newW = Math.max(1, relW * newBoundsWidth);
+            const newH = Math.max(1, relH * newBoundsHeight);
+
+            if (original.type === "rect") {
+              updateElement(id, { x: newX, y: newY, width: newW, height: newH });
+            } else if (original.type === "ellipse") {
+              updateElement(id, {
+                cx: newX + newW / 2,
+                cy: newY + newH / 2,
+                rx: newW / 2,
+                ry: newH / 2,
+              });
+            } else if (original.type === "line") {
+              const relX1 = ((original.x1 ?? 0) - originalBounds.x) / originalBounds.width;
+              const relY1 = ((original.y1 ?? 0) - originalBounds.y) / originalBounds.height;
+              const relX2 = ((original.x2 ?? 0) - originalBounds.x) / originalBounds.width;
+              const relY2 = ((original.y2 ?? 0) - originalBounds.y) / originalBounds.height;
+
+              updateElement(id, {
+                x1: newBoundsX + relX1 * newBoundsWidth,
+                y1: newBoundsY + relY1 * newBoundsHeight,
+                x2: newBoundsX + relX2 * newBoundsWidth,
+                y2: newBoundsY + relY2 * newBoundsHeight,
+              });
+            } else if (original.type === "path") {
+              updateElement(id, {
+                bounds: {
+                  ...original.bounds, // Preserve other path bounds props if any
+                  x: newX,
+                  y: newY,
+                  width: newW,
+                  height: newH,
+                },
+              });
+            }
           }
         }
       }
@@ -793,6 +834,27 @@ export function useCanvasInteractions({
           endX: world.x,
           endY: world.y,
         });
+
+        const elements = useCanvasStore.getState().elements;
+        const boxElements = getShapesInBox(
+          {
+            startX: marqueeStartRef.current.worldX,
+            startY: marqueeStartRef.current.worldY,
+            endX: world.x,
+            endY: world.y,
+          },
+          elements,
+        );
+
+        if (boxElements.length > 0 || initialSelectedIdsRef.current.length > 0) {
+          const newIds = [...new Set([...initialSelectedIdsRef.current, ...boxElements.map((e) => e.id)])];
+
+          if (newIds.length !== selectedIds.length || !newIds.every((id) => selectedIds.includes(id))) {
+            setSelectedIds(newIds);
+          }
+        } else if (selectedIds.length > 0) {
+          setSelectedIds([]);
+        }
       }
     },
     [
@@ -814,44 +876,48 @@ export function useCanvasInteractions({
     ],
   );
 
-  const handleMouseUp = useCallback(
-    (getElementsInBox: (box: { startX: number; startY: number; endX: number; endY: number }) => CanvasElement[]) => {
-      if (isMarqueeSelecting && marqueeStartRef.current) {
-        const world = screenToWorld(lastMousePosRef.current.x, lastMousePosRef.current.y);
-        const boxElements = getElementsInBox({
+  const handleMouseUp = useCallback(() => {
+    if (isMarqueeSelecting && marqueeStartRef.current) {
+      const world = screenToWorld(lastMousePosRef.current.x, lastMousePosRef.current.y);
+      const elements = useCanvasStore.getState().elements;
+      const boxElements = getShapesInBox(
+        {
           startX: marqueeStartRef.current.worldX,
           startY: marqueeStartRef.current.worldY,
           endX: world.x,
           endY: world.y,
-        });
-        if (boxElements.length > 0) {
-          setSelectedIds([...new Set([...selectedIds, ...boxElements.map((e) => e.id)])]);
-        }
-        setSelectionBox(null);
+        },
+        elements,
+      );
+      if (boxElements.length > 0 || initialSelectedIdsRef.current.length > 0) {
+        setSelectedIds([...new Set([...initialSelectedIdsRef.current, ...boxElements.map((e) => e.id)])]);
+      } else {
+        setSelectedIds([]);
       }
-      setIsPanning(false);
-      setIsDragging(false);
-      setIsResizing(false);
-      setIsRotating(false);
-      setIsMarqueeSelecting(false);
-      dragStartRef.current = null;
-      resizeStartRef.current = null;
-      rotateStartRef.current = null;
-      marqueeStartRef.current = null;
-    },
-    [
-      isMarqueeSelecting,
-      screenToWorld,
-      selectedIds,
-      setIsPanning,
-      setIsDragging,
-      setIsResizing,
-      setIsRotating,
-      setIsMarqueeSelecting,
-      setSelectedIds,
-      setSelectionBox,
-    ],
-  );
+      setSelectionBox(null);
+    }
+
+    setIsPanning(false);
+    setIsDragging(false);
+    setIsResizing(false);
+    setIsRotating(false);
+    setIsMarqueeSelecting(false);
+    dragStartRef.current = null;
+    resizeStartRef.current = null;
+    rotateStartRef.current = null;
+    marqueeStartRef.current = null;
+  }, [
+    isMarqueeSelecting,
+    screenToWorld,
+    selectedIds,
+    setIsPanning,
+    setIsDragging,
+    setIsResizing,
+    setIsRotating,
+    setIsMarqueeSelecting,
+    setSelectedIds,
+    setSelectionBox,
+  ]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {

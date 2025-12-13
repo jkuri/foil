@@ -22,6 +22,7 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
   const contextMenuTarget = useCanvasStore((s) => s.contextMenuTarget);
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const elements = useCanvasStore((s) => s.elements);
+  const transform = useCanvasStore((s) => s.transform); // Added
   const clipboard = useCanvasStore((s) => s.clipboard);
   const deleteSelected = useCanvasStore((s) => s.deleteSelected);
   const duplicateSelected = useCanvasStore((s) => s.duplicateSelected);
@@ -45,15 +46,29 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
     }
   };
 
-  const handleAddRect = () => {
+  const getPosition = (e?: React.MouseEvent) => {
+    if (e) {
+      return {
+        x: (e.clientX - transform.x) / transform.scale,
+        y: (e.clientY - transform.y) / transform.scale,
+      };
+    }
+    return {
+      x: (window.innerWidth / 2 - transform.x) / transform.scale,
+      y: (window.innerHeight / 2 - transform.y) / transform.scale,
+    };
+  };
+
+  const handleAddRect = (e?: React.MouseEvent) => {
+    const pos = getPosition(e);
     addElement({
       id: crypto.randomUUID(),
       type: "rect",
       name: `Rectangle ${elements.filter((e) => e.type === "rect").length + 1}`,
-      x: 100 + Math.random() * 200,
-      y: 100 + Math.random() * 200,
-      width: 100 + Math.random() * 100,
-      height: 80 + Math.random() * 80,
+      x: pos.x - 50,
+      y: pos.y - 40,
+      width: 100,
+      height: 80,
       rotation: 0,
       fill: getRandomShapeColorCSS(),
       stroke: null,
@@ -61,15 +76,16 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
     });
   };
 
-  const handleAddEllipse = () => {
+  const handleAddEllipse = (e?: React.MouseEvent) => {
+    const pos = getPosition(e);
     addElement({
       id: crypto.randomUUID(),
       type: "ellipse",
       name: `Ellipse ${elements.filter((e) => e.type === "ellipse").length + 1}`,
-      cx: 200 + Math.random() * 200,
-      cy: 200 + Math.random() * 200,
-      rx: 50 + Math.random() * 50,
-      ry: 40 + Math.random() * 40,
+      cx: pos.x,
+      cy: pos.y,
+      rx: 50,
+      ry: 40,
       rotation: 0,
       fill: getRandomShapeColorCSS(),
       stroke: null,
@@ -77,17 +93,16 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
     });
   };
 
-  const handleAddLine = () => {
-    const x1 = 100 + Math.random() * 200;
-    const y1 = 100 + Math.random() * 200;
+  const handleAddLine = (e?: React.MouseEvent) => {
+    const pos = getPosition(e);
     addElement({
       id: crypto.randomUUID(),
       type: "line",
       name: `Line ${elements.filter((e) => e.type === "line").length + 1}`,
-      x1,
-      y1,
-      x2: x1 + 100 + Math.random() * 100,
-      y2: y1 + Math.random() * 100 - 50,
+      x1: pos.x - 50,
+      y1: pos.y,
+      x2: pos.x + 50,
+      y2: pos.y,
       rotation: 0,
       fill: null,
       stroke: { color: getRandomShapeColorCSS(), width: 2 },

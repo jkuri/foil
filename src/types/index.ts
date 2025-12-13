@@ -47,8 +47,8 @@ export interface LineElement extends BaseElement {
   y1: number;
   x2: number;
   y2: number;
-  markerStart?: "none" | "arrow";
-  markerEnd?: "none" | "arrow";
+  markerStart?: "none" | "arrow" | "triangle" | "reversed_triangle" | "circle" | "diamond" | "round" | "square";
+  markerEnd?: "none" | "arrow" | "triangle" | "reversed_triangle" | "circle" | "diamond" | "round" | "square";
 }
 
 // Path shape (SVG path with d attribute)
