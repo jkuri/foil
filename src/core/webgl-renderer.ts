@@ -386,7 +386,7 @@ export class WebGLRenderer {
     const { x, y, width, height, fill, stroke, rotation, opacity } = element;
     const gl = this.gl;
     // Clamping radius to half dimension
-    const r = Math.min((element.rx || 0), width / 2, height / 2);
+    const r = Math.min(element.rx || 0, width / 2, height / 2);
     const centerX = x + width / 2;
     const centerY = y + height / 2;
 
@@ -427,10 +427,7 @@ export class WebGLRenderer {
       const rw = width - 2 * r;
       const rh = height;
       if (rw > 0) {
-          vRects.push(
-              rx, ry, rx + rw, ry, rx, ry + rh,
-              rx, ry + rh, rx + rw, ry, rx + rw, ry + rh
-          );
+        vRects.push(rx, ry, rx + rw, ry, rx, ry + rh, rx, ry + rh, rx + rw, ry, rx + rw, ry + rh);
       }
 
       // Left Block
@@ -439,22 +436,16 @@ export class WebGLRenderer {
       const lw = r;
       const lh = height - 2 * r;
       if (lh > 0) {
-          vRects.push(
-              lx, ly, lx + lw, ly, lx, ly + lh,
-              lx, ly + lh, lx + lw, ly, lx + lw, ly + lh
-          );
+        vRects.push(lx, ly, lx + lw, ly, lx, ly + lh, lx, ly + lh, lx + lw, ly, lx + lw, ly + lh);
       }
 
-       // Right Block
+      // Right Block
       const rix = x + width - r;
       const riy = y + r;
       const riw = r;
       const rih = height - 2 * r;
       if (rih > 0) {
-          vRects.push(
-              rix, riy, rix + riw, riy, rix, riy + rih,
-              rix, riy + rih, rix + riw, riy, rix + riw, riy + rih
-          );
+        vRects.push(rix, riy, rix + riw, riy, rix, riy + rih, rix, riy + rih, rix + riw, riy, rix + riw, riy + rih);
       }
 
       // Set up shader for fill
@@ -470,18 +461,19 @@ export class WebGLRenderer {
       // Easier to verify with individual draws or one buffer update
 
       const drawFan = (pts: number[]) => {
-           // pts: cx, cy, p0x, p0y, p1x, p1y...
-           // Center is index 0, 1.
-           // Triangles: (0,1), (2,3), (4,5) -> (c, p0, p1)
-           const cx = pts[0], cy = pts[1];
-           const tris: number[] = [];
-           for (let i = 2; i < pts.length - 2; i += 2) {
-               tris.push(cx, cy, pts[i], pts[i+1], pts[i+2], pts[i+3]);
-           }
-           const fV = new Float32Array(tris);
-           gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-           gl.bufferData(gl.ARRAY_BUFFER, fV, gl.STATIC_DRAW);
-           gl.drawArrays(gl.TRIANGLES, 0, tris.length / 2);
+        // pts: cx, cy, p0x, p0y, p1x, p1y...
+        // Center is index 0, 1.
+        // Triangles: (0,1), (2,3), (4,5) -> (c, p0, p1)
+        const cx = pts[0],
+          cy = pts[1];
+        const tris: number[] = [];
+        for (let i = 2; i < pts.length - 2; i += 2) {
+          tris.push(cx, cy, pts[i], pts[i + 1], pts[i + 2], pts[i + 3]);
+        }
+        const fV = new Float32Array(tris);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, fV, gl.STATIC_DRAW);
+        gl.drawArrays(gl.TRIANGLES, 0, tris.length / 2);
       };
 
       const c1 = getCornerVertices(cNW.x, cNW.y, Math.PI, 1.5 * Math.PI); // NW
@@ -536,14 +528,14 @@ export class WebGLRenderer {
       // We effectively need to draw a "thick line" arc.
       // Approximated by small segments.
       const drawArcStroke = (cx: number, cy: number, start: number, end: number) => {
-          const segments = 12;
-          for (let i = 0; i < segments; i++) {
-              const a1 = start + (i / segments) * (end - start);
-              const a2 = start + ((i + 1) / segments) * (end - start);
-              const p1 = { x: cx + Math.cos(a1) * r, y: cy + Math.sin(a1) * r };
-              const p2 = { x: cx + Math.cos(a2) * r, y: cy + Math.sin(a2) * r };
-              this.drawLineBetweenPoints(p1, p2, w, 1);
-          }
+        const segments = 12;
+        for (let i = 0; i < segments; i++) {
+          const a1 = start + (i / segments) * (end - start);
+          const a2 = start + ((i + 1) / segments) * (end - start);
+          const p1 = { x: cx + Math.cos(a1) * r, y: cy + Math.sin(a1) * r };
+          const p2 = { x: cx + Math.cos(a2) * r, y: cy + Math.sin(a2) * r };
+          this.drawLineBetweenPoints(p1, p2, w, 1);
+        }
       };
 
       drawArcStroke(cNW.x, cNW.y, Math.PI, 1.5 * Math.PI);
