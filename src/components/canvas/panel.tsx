@@ -12,6 +12,7 @@ export function Panel({ children, className, ...props }: PanelProps) {
         className,
       )}
       onMouseDown={(e) => e.stopPropagation()}
+      onWheel={(e) => e.stopPropagation()}
       {...props}
     >
       {children}

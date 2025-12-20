@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/store";
@@ -185,196 +185,285 @@ interface LayerItemProps {
   allElements: CanvasElement[];
   depth: number;
   isSelected: boolean;
+  isExpanded: boolean;
   onSelect: (id: string, multiSelect: boolean) => void;
+  onToggleExpand: (id: string) => void;
 }
 
-function LayerItem({ element, allElements, depth, isSelected, onSelect }: LayerItemProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState(element.name);
+const LayerItem = memo(
+  ({ element, allElements, depth, isSelected, isExpanded, onSelect, onToggleExpand }: LayerItemProps) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState(element.name);
 
-  const expandedGroupIds = useCanvasStore((s) => s.expandedGroupIds);
-  const toggleGroupExpanded = useCanvasStore((s) => s.toggleGroupExpanded);
-  const setElementVisibility = useCanvasStore((s) => s.setElementVisibility);
-  const renameElement = useCanvasStore((s) => s.renameElement);
-  const updateElement = useCanvasStore((s) => s.updateElement);
+    const setElementVisibility = useCanvasStore((s) => s.setElementVisibility);
+    const renameElement = useCanvasStore((s) => s.renameElement);
+    const updateElement = useCanvasStore((s) => s.updateElement);
 
-  const isGroup = element.type === "group";
-  const isExpanded = isGroup && expandedGroupIds.includes(element.id);
-  const isVisible = element.visible !== false;
-  const isLocked = element.locked === true;
+    const isGroup = element.type === "group";
+    const isVisible = element.visible !== false;
+    const isLocked = element.locked === true;
 
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSelect(element.id, e.shiftKey || e.metaKey);
-  };
+    const handleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onSelect(element.id, e.shiftKey || e.metaKey);
+    };
 
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsEditing(true);
-    setEditName(element.name);
-  };
-
-  const handleRename = () => {
-    if (editName.trim() && editName !== element.name) {
-      renameElement(element.id, editName.trim());
-    }
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleRename();
-    } else if (e.key === "Escape") {
+    const handleDoubleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setIsEditing(true);
       setEditName(element.name);
+    };
+
+    const handleRename = () => {
+      if (editName.trim() && editName !== element.name) {
+        renameElement(element.id, editName.trim());
+      }
       setIsEditing(false);
-    }
-  };
+    };
 
-  const handleToggleExpand = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    toggleGroupExpanded(element.id);
-  };
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        handleRename();
+      } else if (e.key === "Escape") {
+        setEditName(element.name);
+        setIsEditing(false);
+      }
+    };
 
-  const handleToggleVisibility = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setElementVisibility(element.id, !isVisible);
-  };
+    const handleToggleExpand = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onToggleExpand(element.id);
+    };
 
-  const handleToggleLock = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    updateElement(element.id, { locked: !isLocked });
-  };
+    const handleToggleVisibility = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setElementVisibility(element.id, !isVisible);
+    };
 
-  // Get the right icon for the element type
-  const getTypeIcon = () => {
-    switch (element.type) {
-      case "rect":
-        return <RectIcon />;
-      case "ellipse":
-        return <EllipseIcon />;
-      case "line":
-        return <LineIcon />;
-      case "path":
-        return <PathIcon />;
-      case "group":
-        return <FolderIcon />;
-    }
-  };
+    const handleToggleLock = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      updateElement(element.id, { locked: !isLocked });
+    };
 
-  return (
-    <>
-      <div
-        role="button"
-        tabIndex={0}
-        className={cn(
-          "group flex h-7 cursor-pointer items-center pr-2 text-sm transition-colors",
-          isSelected
-            ? "bg-accent text-accent-foreground"
-            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-        )}
-        style={{ paddingLeft: depth * 12 + 8 }}
-        onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onSelect(element.id, e.shiftKey || e.metaKey);
-          }
-        }}
-      >
-        {/* Expand/collapse button for groups */}
-        <div className="flex w-4 shrink-0 items-center justify-center">
-          {isGroup && (
+    // Get the right icon for the element type
+    const getTypeIcon = () => {
+      switch (element.type) {
+        case "rect":
+          return <RectIcon />;
+        case "ellipse":
+          return <EllipseIcon />;
+        case "line":
+          return <LineIcon />;
+        case "path":
+          return <PathIcon />;
+        case "group":
+          return <FolderIcon />;
+        default:
+          return <RectIcon />;
+      }
+    };
+
+    return (
+      <>
+        <div
+          role="button"
+          tabIndex={0}
+          className={cn(
+            "group flex h-7 cursor-pointer items-center pr-2 text-sm transition-colors",
+            isSelected
+              ? "bg-accent text-accent-foreground"
+              : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+          )}
+          style={{ paddingLeft: depth * 12 + 8 }}
+          onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSelect(element.id, e.shiftKey || e.metaKey);
+            }
+          }}
+        >
+          {/* Expand/collapse button for groups */}
+          <div className="flex w-4 shrink-0 items-center justify-center">
+            {isGroup && (
+              <button
+                type="button"
+                className="flex size-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
+                onClick={handleToggleExpand}
+              >
+                {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
+              </button>
+            )}
+          </div>
+
+          {/* Type icon */}
+          <span className={cn("mr-2 shrink-0 opacity-70", isSelected && "opacity-100")}>{getTypeIcon()}</span>
+
+          {/* Name */}
+          {isEditing ? (
+            <Input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onBlur={handleRename}
+              onKeyDown={handleKeyDown}
+              className="h-6 flex-1 px-1 text-xs"
+              autoFocus
+            />
+          ) : (
+            <span className="flex-1 truncate font-medium text-xs">{element.name}</span>
+          )}
+
+          {/* Action buttons (shown on hover or if locked/hidden) */}
+          <div
+            className={cn(
+              "flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100",
+              (!isVisible || isLocked) && "opacity-100",
+            )}
+          >
             <button
               type="button"
-              className="flex size-4 items-center justify-center rounded-sm hover:bg-muted-foreground/20"
-              onClick={handleToggleExpand}
+              className={cn(
+                "flex size-5 items-center justify-center rounded-sm hover:bg-muted-foreground/20",
+                !isVisible && "text-muted-foreground",
+              )}
+              onClick={handleToggleVisibility}
+              title={isVisible ? "Hide" : "Show"}
             >
-              {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
+              {isVisible ? <EyeIcon /> : <EyeOffIcon />}
             </button>
-          )}
+            <button
+              type="button"
+              className={cn(
+                "flex size-5 items-center justify-center rounded-sm hover:bg-muted-foreground/20",
+                isLocked && "text-muted-foreground",
+              )}
+              onClick={handleToggleLock}
+              title={isLocked ? "Unlock" : "Lock"}
+            >
+              {isLocked ? <LockIcon /> : <UnlockIcon />}
+            </button>
+          </div>
         </div>
 
-        {/* Type icon */}
-        <span className={cn("mr-2 shrink-0 opacity-70", isSelected && "opacity-100")}>{getTypeIcon()}</span>
+        {/* Render children if group is expanded */}
+        {isGroup && isExpanded && (
+          <div>
+            {(element as GroupElement).childIds.map((childId) => {
+              const child = allElements.find((e) => e.id === childId);
+              if (!child) return null;
 
-        {/* Name */}
-        {isEditing ? (
-          <Input
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            onBlur={handleRename}
-            onKeyDown={handleKeyDown}
-            className="h-6 flex-1 px-1 text-xs"
-            autoFocus
-          />
-        ) : (
-          <span className="flex-1 truncate font-medium text-xs">{element.name}</span>
+              // Determine if child is selected/expanded (passed from parent or store?
+              // We need access to these for children.
+              // To avoid context overhead, we can access store here or better:
+              // Since 'LayerItem' is memoized, we need to pass these props carefully.
+              // But 'allElements.find' makes it depend on 'allElements'.
+              // If 'allElements' changes (drag), this re-renders.
+              // We need to construct the tree properly or accept that children re-render.
+              // However, since we memoize LayerItem, if 'child' object reference changes (it does on drag), it re-renders.
+              // We need the custom comparator to ignore position changes.
+
+              // We need to pass the props for the child item
+              // Since we are inside the parent implementation, we can't easily memoize the children *list* generation
+              // without calculating it outside.
+
+              // Let's pass the store access down or use a wrapper.
+              // Ideally, the parent component handles the map.
+              return (
+                <LayerItemWrapper
+                  key={childId}
+                  elementId={childId}
+                  allElements={allElements}
+                  depth={depth + 1}
+                  onSelect={onSelect}
+                  onToggleExpand={onToggleExpand}
+                />
+              );
+            })}
+          </div>
         )}
+      </>
+    );
+  },
+  (prev, next) => {
+    // Custom Comparator to ignore non-visual updates (x,y)
+    if (prev.isSelected !== next.isSelected) return false;
+    if (prev.isExpanded !== next.isExpanded) return false;
+    if (prev.depth !== next.depth) return false;
 
-        {/* Action buttons (shown on hover or if locked/hidden) */}
-        <div
-          className={cn(
-            "flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100",
-            (!isVisible || isLocked) && "opacity-100",
-          )}
-        >
-          <button
-            type="button"
-            className={cn(
-              "flex size-5 items-center justify-center rounded-sm hover:bg-muted-foreground/20",
-              !isVisible && "text-muted-foreground",
-            )}
-            onClick={handleToggleVisibility}
-            title={isVisible ? "Hide" : "Show"}
-          >
-            {isVisible ? <EyeIcon /> : <EyeOffIcon />}
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "flex size-5 items-center justify-center rounded-sm hover:bg-muted-foreground/20",
-              isLocked && "text-muted-foreground",
-            )}
-            onClick={handleToggleLock}
-            title={isLocked ? "Unlock" : "Lock"}
-          >
-            {isLocked ? <LockIcon /> : <UnlockIcon />}
-          </button>
-        </div>
-      </div>
+    const p = prev.element;
+    const n = next.element;
 
-      {/* Render children if group is expanded */}
-      {isGroup && isExpanded && (
-        <div>
-          {(element as GroupElement).childIds.map((childId) => {
-            const child = allElements.find((e) => e.id === childId);
-            if (!child) return null;
-            return (
-              <LayerItem
-                key={childId}
-                element={child}
-                allElements={allElements}
-                depth={depth + 1}
-                isSelected={useCanvasStore.getState().selectedIds.includes(childId)}
-                onSelect={onSelect}
-              />
-            );
-          })}
-        </div>
-      )}
-    </>
+    if (p.id !== n.id) return false;
+    if (p.name !== n.name) return false;
+    if (p.visible !== n.visible) return false;
+    if (p.locked !== n.locked) return false;
+    if (p.type !== n.type) return false;
+
+    // specific checks per type if needed (e.g., text content)
+
+    // For groups, check childIds length/content equality
+    if (p.type === "group" && n.type === "group") {
+      const pg = p as GroupElement;
+      const ng = n as GroupElement;
+      if (pg.childIds !== ng.childIds) {
+        // reference check usually sufficient if immutable
+        if (pg.childIds.length !== ng.childIds.length) return false;
+        // Deep check if needed, but normally ref check works for array if replaced
+        for (let i = 0; i < pg.childIds.length; i++) {
+          if (pg.childIds[i] !== ng.childIds[i]) return false;
+        }
+      }
+    }
+
+    // Ignore x, y, width, height, rotation, opacity, fill, stroke
+    return true;
+  },
+);
+
+// Wrapper to connect store state to LayerItem props correctly
+// enabling the Memoization to work effectively.
+const LayerItemWrapper = ({
+  elementId,
+  allElements,
+  depth,
+  onSelect,
+  onToggleExpand,
+}: {
+  elementId: string;
+  allElements: CanvasElement[];
+  depth: number;
+  onSelect: (id: string, multiSelect: boolean) => void;
+  onToggleExpand: (id: string) => void;
+}) => {
+  const element = allElements.find((e) => e.id === elementId);
+  const isSelected = useCanvasStore((s) => s.selectedIds.includes(elementId));
+  const isExpanded = useCanvasStore((s) => s.expandedGroupIds.includes(elementId));
+
+  if (!element) return null;
+
+  return (
+    <LayerItem
+      element={element}
+      allElements={allElements}
+      depth={depth}
+      isSelected={isSelected}
+      isExpanded={isExpanded}
+      onSelect={onSelect}
+      onToggleExpand={onToggleExpand}
+    />
   );
-}
+};
 
 export function LayersPanel() {
   const elements = useCanvasStore((s) => s.elements);
-  const selectedIds = useCanvasStore((s) => s.selectedIds);
+
   const setSelectedIds = useCanvasStore((s) => s.setSelectedIds);
   const toggleSelection = useCanvasStore((s) => s.toggleSelection);
+  const toggleGroupExpanded = useCanvasStore((s) => s.toggleGroupExpanded);
 
   // Filter to top-level elements (no parent)
-  const topLevelElements = elements.filter((e) => !e.parentId);
+  const topLevelElements = useMemo(() => elements.filter((e) => !e.parentId), [elements]);
 
   const handleSelect = (id: string, multiSelect: boolean) => {
     if (multiSelect) {
@@ -386,31 +475,35 @@ export function LayersPanel() {
 
   return (
     <>
-      <div className="flex h-10 items-center gap-2 border-b px-3">
-        <LayersIcon />
-        <h3 className="font-medium text-sm">Layers</h3>
+      <div className="flex h-10 items-center justify-between border-b bg-muted/30 px-3">
+        <div className="flex items-center gap-2">
+          <LayersIcon />
+          <h3 className="font-medium text-sm">Layers</h3>
+        </div>
       </div>
-      <div className="flex-1 overflow-auto py-2">
-        {topLevelElements.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground text-xs">
-            <p>No layers</p>
-            <p className="mt-1 opacity-50">Add a shape to start</p>
-          </div>
-        ) : (
-          // Render in reverse order (top layer first)
-          [...topLevelElements]
-            .reverse()
-            .map((element) => (
-              <LayerItem
-                key={element.id}
-                element={element}
-                allElements={elements}
-                depth={0}
-                isSelected={selectedIds.includes(element.id)}
-                onSelect={handleSelect}
-              />
-            ))
-        )}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="custom-scrollbar flex-1 overflow-y-auto overflow-x-hidden py-2">
+          {topLevelElements.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground text-xs">
+              <p>No layers</p>
+              <p className="mt-1 opacity-50">Add a shape to start</p>
+            </div>
+          ) : (
+            // Render in reverse order (top layer first)
+            [...topLevelElements]
+              .reverse()
+              .map((element) => (
+                <LayerItemWrapper
+                  key={element.id}
+                  elementId={element.id}
+                  allElements={elements}
+                  depth={0}
+                  onSelect={handleSelect}
+                  onToggleExpand={toggleGroupExpanded}
+                />
+              ))
+          )}
+        </div>
       </div>
     </>
   );

@@ -323,6 +323,12 @@ export function useCanvasInteractions({
 
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
+      // Ignore events originating from UI panels
+      const target = e.target as HTMLElement;
+      if (target.closest(".pointer-events-auto")) {
+        return;
+      }
+
       const shouldPan = activeTool === "pan" || e.button === 1 || (e.button === 0 && isSpaceHeld);
 
       if (shouldPan) {
@@ -494,7 +500,7 @@ export function useCanvasInteractions({
                     bounds?: { x: number; y: number; width: number; height: number; rotation?: number };
                   }
                 >();
-                // Helper to collect all elements (including group children)
+                // biome-ignore lint/suspicious/noExplicitAny: complex type
                 const collectElements = (els: CanvasElement[], map: Map<string, any>) => {
                   for (const element of els) {
                     if (element.type === "group") {
@@ -581,6 +587,7 @@ export function useCanvasInteractions({
                 { x: number; y: number; cx?: number; cy?: number; x1?: number; y1?: number; x2?: number; y2?: number }
               >();
               // Helper to collect all draggable elements (including group children)
+              // biome-ignore lint/suspicious/noExplicitAny: complex type
               const collectDraggableElements = (ids: string[], map: Map<string, any>) => {
                 for (const id of ids) {
                   const element = getElementById(id);

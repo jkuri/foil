@@ -512,7 +512,7 @@ export function WebGLCanvas() {
       <CanvasToolbar />
 
       {/* Layers Panel */}
-      <Panel className="absolute top-0 left-0 border-r border-l-0">
+      <Panel className="absolute top-0 bottom-0 left-0 border-r border-l-0">
         <LayersPanel />
       </Panel>
 

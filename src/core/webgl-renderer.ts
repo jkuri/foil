@@ -1,6 +1,7 @@
 import { cssToRGBA } from "@/lib/colors";
 import { parsePath, pathToFillVertices, pathToStrokeVertices } from "@/lib/path-parser";
 import type {
+  BoundingBox,
   CanvasElement,
   EllipseElement,
   LineElement,
@@ -8,6 +9,7 @@ import type {
   RectElement,
   SelectionBox,
   Shape,
+  TextElement,
   Transform,
 } from "@/types";
 
@@ -379,19 +381,27 @@ export class WebGLRenderer {
         // For groups, we could calculate combined bounds, but for now just pass check to children
         // effectively checking each child.
         // Optimization: Groups often don't have explicit bounds stored.
-      } else if (element.type === "rect" || element.type === "image" || element.type === "text") {
-        // We know these exist on these types
-        ex = (element as any).x;
-        ey = (element as any).y;
-        // text doesn't have explicit width/height in model usually but we can estimate or skip
-        ew = (element as any).width || 0;
-        eh = (element as any).height || 0;
-
-        // Skip culling for Text if width/height is 0 (it might be dynamic)
-        if (element.type === "text") {
-          // Text usually needs measurement. Skip culling or assume large bounds?
-          // Safest to SKIP culling for text if we don't know bounds.
-          // However, if we do bounds check:
+      } else if (element.type === "rect" || element.type === "image") {
+        ex = element.x;
+        ey = element.y;
+        ew = element.width;
+        eh = element.height;
+      } else if (element.type === "text") {
+        const el = element as TextElement;
+        ex = el.x;
+        ey = el.y;
+        // Text usually needs measurement. Skip culling or asume large bounds?
+        // Safest to SKIP culling for text if we don't know bounds.
+        // However, if we do bounds check:
+        if (el.bounds) {
+          ew = el.bounds.width;
+          eh = el.bounds.height;
+        } else {
+          // If no bounds, force render (skip culling)
+          ex = visibleBounds.minX;
+          ey = visibleBounds.minY;
+          ew = 1;
+          eh = 1;
         }
       } else if (element.type === "ellipse") {
         const el = element as EllipseElement;
