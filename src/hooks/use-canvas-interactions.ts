@@ -13,6 +13,7 @@ import {
 import { resizePath } from "@/lib/svg-import";
 import { useCanvasStore } from "@/store";
 import type { BoundingBox, CanvasElement, ResizeHandle, Shape } from "@/types";
+import { getElementBounds } from "@/types";
 
 // Helper to flatten groups recursively
 function flattenCanvasElements(
@@ -141,57 +142,6 @@ function getRotatedCursor(handle: ResizeHandle, rotation: number): string {
   }
 
   return cursorCache.get(cacheKey)!;
-}
-
-// Helper to get bounds for any element type
-function getElementBoundsLocal(element: CanvasElement): { x: number; y: number; width: number; height: number } {
-  switch (element.type) {
-    case "rect":
-      return { x: element.x, y: element.y, width: element.width, height: element.height };
-    case "ellipse":
-      return {
-        x: element.cx - element.rx,
-        y: element.cy - element.ry,
-        width: element.rx * 2,
-        height: element.ry * 2,
-      };
-    case "line": {
-      const minX = Math.min(element.x1, element.x2);
-      const minY = Math.min(element.y1, element.y2);
-      return {
-        x: minX,
-        y: minY,
-        width: Math.abs(element.x2 - element.x1),
-        height: Math.abs(element.y2 - element.y1),
-      };
-    }
-    case "path":
-      return element.bounds;
-    case "text": {
-      const width = element.text.length * element.fontSize * 0.6;
-      const height = element.fontSize * 1.2;
-      return { x: element.x, y: element.y - element.fontSize, width, height };
-    }
-    case "polygon":
-    case "polyline": {
-      if (element.points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
-      let minX = element.points[0].x;
-      let minY = element.points[0].y;
-      let maxX = minX;
-      let maxY = minY;
-      for (const pt of element.points) {
-        minX = Math.min(minX, pt.x);
-        minY = Math.min(minY, pt.y);
-        maxX = Math.max(maxX, pt.x);
-        maxY = Math.max(maxY, pt.y);
-      }
-      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-    }
-    case "image":
-      return { x: element.x, y: element.y, width: element.width, height: element.height };
-    case "group":
-      return { x: 0, y: 0, width: 0, height: 0 };
-  }
 }
 
 interface UseCanvasInteractionsProps {
@@ -416,7 +366,7 @@ export function useCanvasInteractions({
 
               for (const element of selectedElements) {
                 originalRotations.set(element.id, element.rotation);
-                const eBounds = getElementBoundsLocal(element);
+                const eBounds = getElementBounds(element);
                 const entry = {
                   ...eBounds,
                   rotation: element.rotation,
@@ -489,7 +439,7 @@ export function useCanvasInteractions({
               let flattenedElements: CanvasElement[] = [];
 
               if (isSingleRotatedElement) {
-                bounds = getElementBoundsLocal(selectedElements[0]);
+                bounds = getElementBounds(selectedElements[0]);
                 flattenedElements = [selectedElements[0]];
               } else {
                 flattenedElements = flattenCanvasElements(selectedElements, getElementById);
@@ -529,7 +479,7 @@ export function useCanvasInteractions({
                       collectElements(children, map);
                     } else {
                       // Collect leaf element
-                      const eBounds = getElementBoundsLocal(element);
+                      const eBounds = getElementBounds(element);
                       const entry = {
                         ...eBounds,
                         rotation: element.rotation,

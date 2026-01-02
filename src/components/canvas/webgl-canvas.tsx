@@ -4,6 +4,7 @@ import { useCanvasControls, useCanvasInteractions, useHotkeys } from "@/hooks";
 import { parseSVG, translatePath } from "@/lib/svg-import";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement, Shape } from "@/types";
+import { getElementBounds } from "@/types";
 import { CanvasContextMenu } from "./canvas-context-menu";
 import { CanvasToolbar } from "./canvas-toolbar";
 import { DimensionLabel } from "./dimension-label";
@@ -11,61 +12,6 @@ import { LayersPanel } from "./layers-panel";
 import { Panel } from "./panel";
 import { PropertiesPanel } from "./properties-panel";
 import { SmartGuides } from "./smart-guides";
-
-// Helper to get bounds for any element type
-function getElementBoundsLocal(element: CanvasElement): { x: number; y: number; width: number; height: number } {
-  switch (element.type) {
-    case "rect":
-      return { x: element.x, y: element.y, width: element.width, height: element.height };
-    case "ellipse":
-      return {
-        x: element.cx - element.rx,
-        y: element.cy - element.ry,
-        width: element.rx * 2,
-        height: element.ry * 2,
-      };
-    case "line": {
-      const minX = Math.min(element.x1, element.x2);
-      const minY = Math.min(element.y1, element.y2);
-      return {
-        x: minX,
-        y: minY,
-        width: Math.abs(element.x2 - element.x1) || 1,
-        height: Math.abs(element.y2 - element.y1) || 1,
-      };
-    }
-    case "path":
-      return element.bounds;
-    case "text":
-      if (element.bounds) return element.bounds;
-      return {
-        x: element.x,
-        y: element.y - element.fontSize,
-        width: element.text.length * element.fontSize * 0.6,
-        height: element.fontSize * 1.2,
-      };
-    case "polygon":
-    case "polyline": {
-      if (element.bounds) return element.bounds;
-      if (element.points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
-      let minX = element.points[0].x;
-      let minY = element.points[0].y;
-      let maxX = minX;
-      let maxY = minY;
-      for (const pt of element.points) {
-        minX = Math.min(minX, pt.x);
-        minY = Math.min(minY, pt.y);
-        maxX = Math.max(maxX, pt.x);
-        maxY = Math.max(maxY, pt.y);
-      }
-      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-    }
-    case "image":
-      return { x: element.x, y: element.y, width: element.width, height: element.height };
-    case "group":
-      return { x: 0, y: 0, width: 0, height: 0 };
-  }
-}
 
 export function WebGLCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -167,7 +113,7 @@ export function WebGLCanvas() {
           maxX = -Infinity,
           maxY = -Infinity;
         for (const el of importedElements) {
-          const bounds = getElementBoundsLocal(el);
+          const bounds = getElementBounds(el);
           minX = Math.min(minX, bounds.x);
           minY = Math.min(minY, bounds.y);
           maxX = Math.max(maxX, bounds.x + bounds.width);
@@ -358,7 +304,7 @@ export function WebGLCanvas() {
         };
       }
 
-      const bounds = getElementBoundsLocal(element);
+      const bounds = getElementBounds(element);
       return {
         bounds,
         rotation: element.rotation,
