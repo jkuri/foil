@@ -35,6 +35,24 @@ function flattenCanvasElements(
   return result;
 }
 
+// Helper to get all descendant IDs of elements (for group snap exclusion)
+function getDescendantIds(ids: string[], getElementById: (id: string) => CanvasElement | undefined): Set<string> {
+  const descendants = new Set<string>();
+
+  const collectDescendants = (elementIds: string[]) => {
+    for (const id of elementIds) {
+      descendants.add(id);
+      const element = getElementById(id);
+      if (element?.type === "group") {
+        collectDescendants(element.childIds);
+      }
+    }
+  };
+
+  collectDescendants(ids);
+  return descendants;
+}
+
 // Generate Figma-style SVG cursor for resize handles with rotation
 function createRotatedResizeCursor(angle: number): string {
   // Normalize angle to 0-360
@@ -611,12 +629,17 @@ export function useCanvasInteractions({
 
               collectDraggableElements(elementsToDrag, elementsMap);
 
+              // Get all descendant IDs (including selected elements and their children)
+              // to properly exclude them from snap candidates
+              const excludedIds = getDescendantIds(elementsToDrag, getElementById);
+
               // Pre-calculate candidates for snapping (everything NOT being dragged)
-              // Calculate bounds for each candidate once
-              const snapCandidates = elements.filter((e) => !elementsToDrag.includes(e.id)).map((e) => getBounds(e));
+              const snapCandidates = elements
+                .filter((e) => !excludedIds.has(e.id) && e.type !== "group")
+                .map((e) => getBounds(e));
 
               const snapPoints = elements
-                .filter((e) => !elementsToDrag.includes(e.id))
+                .filter((e) => !excludedIds.has(e.id) && e.type !== "group")
                 .flatMap((e) => getSnapPoints(e));
 
               const draggedEls = elements.filter((e) => elementsToDrag.includes(e.id));
@@ -744,14 +767,18 @@ export function useCanvasInteractions({
             centerY: originalBounds.centerY + deltaY,
           };
 
+          const { snapToGrid, snapToObjects, snapToGeometry, gridSize } = useCanvasStore.getState();
+
           const snapResult = calculateSnapAdjustment(
             projected,
             snapCandidates,
             snapPoints,
-            useCanvasStore.getState().snapToGrid,
-            useCanvasStore.getState().snapToObjects,
-            useCanvasStore.getState().snapToGeometry,
+            snapToGrid,
+            snapToObjects,
+            snapToGeometry,
             transform.scale,
+            10, // threshold
+            gridSize,
           );
 
           finalDeltaX = deltaX + snapResult.x;

@@ -8,5 +8,5 @@ export {
   hitTestRotatedElementHandle,
   hitTestShape,
 } from "./hit-testing";
-export { WebGLRenderer } from "./webgl-renderer";
 export * from "./snapping";
+export { WebGLRenderer } from "./webgl-renderer";

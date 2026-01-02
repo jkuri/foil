@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getRotatedCorners, hitTestResizeHandle, hitTestShape, WebGLRenderer } from "@/core";
-import { useCanvasControls, useCanvasInteractions } from "@/hooks";
+import { useCanvasControls, useCanvasInteractions, useHotkeys } from "@/hooks";
 import { parseSVG, translatePath } from "@/lib/svg-import";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement, Shape } from "@/types";
@@ -71,7 +71,7 @@ export function WebGLCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<WebGLRenderer | null>(null);
-  const [isCmdHeld, setIsCmdHeld] = useState(false);
+  const [_isCmdHeld, setIsCmdHeld] = useState(false);
 
   const {
     elements,
@@ -85,24 +85,17 @@ export function WebGLCanvas() {
     isRotating,
     activeResizeHandle,
     selectionBox,
-    setIsSpaceHeld,
-    setActiveTool,
-    clearSelection,
-    deleteSelected,
-    duplicateSelected,
-    copySelected,
-    paste,
-    flipHorizontal,
-    flipVertical,
-    toggleLock,
-    groupSelected,
-    ungroupSelected,
     canvasBackground,
     canvasBackgroundVisible,
     importElements,
   } = useCanvasStore();
 
   const { handlers, actions } = useCanvasControls();
+
+  // Use centralized hotkeys hook
+  useHotkeys({
+    onCmdChange: setIsCmdHeld,
+  });
 
   const screenToWorld = useCallback(
     (screenX: number, screenY: number) => {
@@ -291,80 +284,6 @@ export function WebGLCanvas() {
     const canvas = canvasRef.current;
     if (!container || !canvas) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Space" && !e.repeat) {
-        e.preventDefault();
-        setIsSpaceHeld(true);
-      }
-      if (e.metaKey || e.ctrlKey) setIsCmdHeld(true);
-
-      // Tool shortcuts (only when no modifier)
-      if (!e.metaKey && !e.ctrlKey && !e.shiftKey) {
-        if (e.code === "KeyV") setActiveTool("select");
-        if (e.code === "KeyH") setActiveTool("pan");
-      }
-
-      if (e.code === "Escape") clearSelection();
-
-      // Delete
-      if ((e.code === "Delete" || e.code === "Backspace") && selectedIds.length > 0) {
-        deleteSelected();
-      }
-
-      // Copy (Cmd+C)
-      if (e.code === "KeyC" && (e.metaKey || e.ctrlKey) && selectedIds.length > 0) {
-        e.preventDefault();
-        copySelected();
-      }
-
-      // Paste (Cmd+V)
-      if (e.code === "KeyV" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        paste();
-      }
-
-      // Duplicate (Cmd+D)
-      if (e.code === "KeyD" && (e.metaKey || e.ctrlKey) && selectedIds.length > 0) {
-        e.preventDefault();
-        duplicateSelected();
-      }
-
-      // Flip Horizontal (Shift+H)
-      if (e.code === "KeyH" && e.shiftKey && !e.metaKey && !e.ctrlKey && selectedIds.length > 0) {
-        e.preventDefault();
-        flipHorizontal();
-      }
-
-      // Flip Vertical (Shift+V)
-      if (e.code === "KeyV" && e.shiftKey && !e.metaKey && !e.ctrlKey && selectedIds.length > 0) {
-        e.preventDefault();
-        flipVertical();
-      }
-
-      // Lock/Unlock (Shift+Cmd+L)
-      if (e.code === "KeyL" && e.shiftKey && (e.metaKey || e.ctrlKey) && selectedIds.length > 0) {
-        e.preventDefault();
-        toggleLock();
-      }
-
-      // Group (Cmd+G)
-      if (e.code === "KeyG" && (e.metaKey || e.ctrlKey) && !e.shiftKey && selectedIds.length > 1) {
-        e.preventDefault();
-        groupSelected();
-      }
-
-      // Ungroup (Cmd+Shift+G)
-      if (e.code === "KeyG" && (e.metaKey || e.ctrlKey) && e.shiftKey && selectedIds.length > 0) {
-        e.preventDefault();
-        ungroupSelected();
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space") setIsSpaceHeld(false);
-      if (!e.metaKey && !e.ctrlKey) setIsCmdHeld(false);
-    };
-
     // Prevent native browser context menu
     const preventContextMenu = (e: MouseEvent) => {
       e.preventDefault();
@@ -377,8 +296,6 @@ export function WebGLCanvas() {
     canvas.addEventListener("drop", handleDrop);
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", onMouseUp);
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
 
     return () => {
       container.removeEventListener("wheel", handleWheel);
@@ -388,34 +305,14 @@ export function WebGLCanvas() {
       canvas.removeEventListener("drop", handleDrop);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [
-    handleWheel,
-    handleMouseDown,
-    handleMouseMove,
-    onMouseUp,
-    handleDragOver,
-    handleDrop,
-    selectedIds,
-    deleteSelected,
-    duplicateSelected,
-    copySelected,
-    paste,
-    flipHorizontal,
-    flipVertical,
-    toggleLock,
-    groupSelected,
-    ungroupSelected,
-    setIsSpaceHeld,
-    setActiveTool,
-    clearSelection,
-  ]);
+  }, [handleWheel, handleMouseDown, handleMouseMove, onMouseUp, handleDragOver, handleDrop]);
 
   // Check if hovered handle is a corner (for rotation)
   const isCornerHandle =
     hoveredHandle === "nw" || hoveredHandle === "ne" || hoveredHandle === "se" || hoveredHandle === "sw";
+
+  const isCmdHeld = _isCmdHeld;
 
   const cursor = isPanning
     ? "grabbing"

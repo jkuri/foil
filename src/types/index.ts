@@ -274,16 +274,22 @@ export interface BoundingBox {
 export type Tool = "select" | "pan" | "rect" | "ellipse" | "line";
 export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | null;
 
-// Smart Guide
+// Smart Guide - Figma-style visual indicators
 export interface SmartGuide {
-  type: "x" | "y" | "distance";
-  x?: number; // For vertical line (x-axis alignment)
-  y?: number; // For horizontal line (y-axis alignment)
+  type: "alignment" | "spacing" | "center";
+  // For alignment guides (edge/center lines)
+  axis?: "x" | "y"; // x = vertical line, y = horizontal line
+  position?: number; // x or y coordinate of the line
+  // Line endpoints
   x1?: number;
   y1?: number;
   x2?: number;
   y2?: number;
-  label?: string; // For distance
+  // For spacing/distance guides
+  label?: string; // Distance in pixels
+  // For center snap indicators
+  cx?: number;
+  cy?: number;
 }
 
 // Helper to get bounding box for any element

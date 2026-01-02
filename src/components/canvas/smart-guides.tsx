@@ -1,123 +1,173 @@
 import { useCanvasStore } from "@/store";
 
+// Figma uses this magenta/pink color for guides
+const GUIDE_COLOR = "#FF00FF";
+
 export function SmartGuides() {
   const smartGuides = useCanvasStore((s) => s.smartGuides);
   const transform = useCanvasStore((s) => s.transform);
-
-  // We render an SVG that covers the viewport, but we apply the transform group to match canvas world space
-  // OR we can just map the lines. Applying transform to a group is easier.
 
   if (smartGuides.length === 0) return null;
 
   return (
     <div className="pointer-events-none absolute inset-0 z-50 overflow-hidden">
       <svg className="h-full w-full">
+        <defs>
+          {/* Dash pattern for alignment lines */}
+          <pattern id="dash-pattern" patternUnits="userSpaceOnUse" width={8 / transform.scale} height={1}>
+            <line
+              x1="0"
+              y1="0"
+              x2={4 / transform.scale}
+              y2="0"
+              stroke={GUIDE_COLOR}
+              strokeWidth={1 / transform.scale}
+            />
+          </pattern>
+        </defs>
         <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
           {smartGuides.map((guide, i) => {
-            const strokeColor = "#F24822"; // Figma Red
             const strokeWidth = 1 / transform.scale;
-            const markerSize = 4 / transform.scale;
 
-            if (guide.type === "x" || guide.type === "y") {
+            // Alignment guides - magenta line connecting objects
+            if (guide.type === "alignment") {
+              const x1 = guide.x1 ?? 0;
+              const y1 = guide.y1 ?? 0;
+              const x2 = guide.x2 ?? 0;
+              const y2 = guide.y2 ?? 0;
+
               return (
-                <g key={i}>
-                  <line
-                    x1={guide.x1 ?? guide.x}
-                    y1={guide.y1 ?? guide.y}
-                    x2={guide.x2 ?? guide.x}
-                    y2={guide.y2 ?? guide.y}
-                    stroke={strokeColor}
-                    strokeWidth={strokeWidth}
-                  />
-                  {/* X markers at endpoints */}
-                  {[
-                    { x: guide.x1 ?? guide.x, y: guide.y1 ?? guide.y },
-                    { x: guide.x2 ?? guide.x, y: guide.y2 ?? guide.y },
-                  ].map((p, idx) => (
-                    <g key={idx} transform={`translate(${p.x}, ${p.y})`}>
-                      <line
-                        x1={-markerSize}
-                        y1={-markerSize}
-                        x2={markerSize}
-                        y2={markerSize}
-                        stroke={strokeColor}
-                        strokeWidth={strokeWidth}
-                      />
-                      <line
-                        x1={-markerSize}
-                        y1={markerSize}
-                        x2={markerSize}
-                        y2={-markerSize}
-                        stroke={strokeColor}
-                        strokeWidth={strokeWidth}
-                      />
-                    </g>
-                  ))}
-                </g>
+                <line
+                  key={i}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke={GUIDE_COLOR}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={`${3 / transform.scale} ${3 / transform.scale}`}
+                />
               );
             }
-            if (guide.type === "distance") {
-              // Render gap line and label
-              // distance guides usually are a single line segment with a label in the middle
-              // For X gap: line from x1 to x2 at y
-              // For Y gap: line from y1 to y2 at x
 
-              // Actually, let's look at how we pushed them.
-              // X-Gap: x was neighbor.maxY, x2 was pMinX. y was center.
-              // Oops, previous logic pushed x/x2?
+            // Spacing/distance guides - line with label pill
+            if (guide.type === "spacing") {
+              const x1 = guide.x1 ?? 0;
+              const y1 = guide.y1 ?? 0;
+              const x2 = guide.x2 ?? 0;
+              const y2 = guide.y2 ?? 0;
+              const cx = (x1 + x2) / 2;
+              const cy = (y1 + y2) / 2;
 
-              // Let's standardise the guide object for distance:
-              // x1, y1 -> Start point
-              // x2, y2 -> End point
-              // label -> Text
+              // Determine if horizontal or vertical
+              const isHorizontal = Math.abs(y2 - y1) < 0.1;
+              const lineLength = isHorizontal ? Math.abs(x2 - x1) : Math.abs(y2 - y1);
 
-              // In X-Gap logic (snapping.ts):
-              // guides.push({ type: "distance", x: leftNeighbor.maxX, y: center, label: ..., x2: pMinX }) -> wait, this is messy.
-              // x1=leftNeighbor.maxX, y1=center, x2=pMinX, y2=center.
+              // Don't show if distance is too small
+              if (lineLength < 5) return null;
 
-              const gx1 = guide.x1 ?? guide.x ?? 0;
-              const gy1 = guide.y1 ?? guide.y ?? 0;
-              const gx2 = guide.x2 ?? guide.x ?? 0;
-              const gy2 = guide.y2 ?? guide.y ?? 0;
-
-              const cx = (gx1 + gx2) / 2;
-              const cy = (gy1 + gy2) / 2;
+              // Cap size for T-shaped ends
+              const capSize = 6 / transform.scale;
 
               return (
                 <g key={i}>
-                  {/* Gap Line */}
-                  <line x1={gx1} y1={gy1} x2={gx2} y2={gy2} stroke={strokeColor} strokeWidth={strokeWidth} />
-                  {/* Perpendicular caps? Figma doesn't always show them for gaps, but shows label. Screenshot shows label in box. */}
-
-                  {/* Label Box */}
-                  <foreignObject
-                    x={cx - 16 / transform.scale}
-                    y={cy - 8 / transform.scale}
-                    width={32 / transform.scale}
-                    height={16 / transform.scale}
-                    className="overflow-visible"
-                  >
-                    <div
-                      style={{
-                        background: strokeColor,
-                        color: "white",
-                        fontSize: `${10 / transform.scale}px`,
-                        padding: `${2 / transform.scale}px ${4 / transform.scale}px`,
-                        borderRadius: `${2 / transform.scale}px`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: "max-content",
-                        transform: "translate(-50%, -50%)",
-                        lineHeight: 1,
-                      }}
+                  {/* Main line */}
+                  <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={GUIDE_COLOR} strokeWidth={strokeWidth} />
+                  {/* T-cap start */}
+                  {isHorizontal ? (
+                    <>
+                      <line
+                        x1={x1}
+                        y1={y1 - capSize}
+                        x2={x1}
+                        y2={y1 + capSize}
+                        stroke={GUIDE_COLOR}
+                        strokeWidth={strokeWidth}
+                      />
+                      <line
+                        x1={x2}
+                        y1={y2 - capSize}
+                        x2={x2}
+                        y2={y2 + capSize}
+                        stroke={GUIDE_COLOR}
+                        strokeWidth={strokeWidth}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <line
+                        x1={x1 - capSize}
+                        y1={y1}
+                        x2={x1 + capSize}
+                        y2={y1}
+                        stroke={GUIDE_COLOR}
+                        strokeWidth={strokeWidth}
+                      />
+                      <line
+                        x1={x2 - capSize}
+                        y1={y2}
+                        x2={x2 + capSize}
+                        y2={y2}
+                        stroke={GUIDE_COLOR}
+                        strokeWidth={strokeWidth}
+                      />
+                    </>
+                  )}
+                  {/* Label pill */}
+                  {guide.label && (
+                    <foreignObject
+                      x={cx - 20 / transform.scale}
+                      y={cy - 10 / transform.scale}
+                      width={40 / transform.scale}
+                      height={20 / transform.scale}
+                      className="overflow-visible"
                     >
-                      {guide.label}
-                    </div>
-                  </foreignObject>
+                      <div
+                        style={{
+                          background: GUIDE_COLOR,
+                          color: "white",
+                          fontSize: `${11 / transform.scale}px`,
+                          fontWeight: 500,
+                          fontFamily: "Inter, system-ui, sans-serif",
+                          padding: `${2 / transform.scale}px ${6 / transform.scale}px`,
+                          borderRadius: `${3 / transform.scale}px`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: "max-content",
+                          transform: "translate(-50%, -50%)",
+                          marginLeft: "50%",
+                          marginTop: "50%",
+                          lineHeight: 1,
+                        }}
+                      >
+                        {guide.label}
+                      </div>
+                    </foreignObject>
+                  )}
                 </g>
               );
             }
+
+            // Center indicator - small diamond
+            if (guide.type === "center") {
+              const cx = guide.cx ?? 0;
+              const cy = guide.cy ?? 0;
+              const size = 4 / transform.scale;
+
+              return (
+                <g key={i}>
+                  {/* Diamond shape */}
+                  <polygon
+                    points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
+                    fill={GUIDE_COLOR}
+                    stroke="white"
+                    strokeWidth={strokeWidth * 0.5}
+                  />
+                </g>
+              );
+            }
+
             return null;
           })}
         </g>

@@ -38,6 +38,7 @@ interface CanvasState {
   snapToGrid: boolean;
   snapToObjects: boolean;
   snapToGeometry: boolean;
+  gridSize: number;
   smartGuides: SmartGuide[];
 }
 
@@ -46,6 +47,7 @@ interface CanvasActions {
   setSnapToGrid: (enabled: boolean) => void;
   setSnapToObjects: (enabled: boolean) => void;
   setSnapToGeometry: (enabled: boolean) => void;
+  setGridSize: (size: number) => void;
   setSmartGuides: (guides: SmartGuide[]) => void;
   // Element actions
   addElement: (element: CanvasElement) => void;
@@ -213,6 +215,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => 
   snapToGrid: true,
   snapToObjects: true,
   snapToGeometry: false,
+  gridSize: 10,
   smartGuides: [],
 
   // Element actions
@@ -657,6 +660,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => 
   setSnapToGrid: (snap) => set({ snapToGrid: snap }),
   setSnapToObjects: (snap) => set({ snapToObjects: snap }),
   setSnapToGeometry: (snap) => set({ snapToGeometry: snap }),
+  setGridSize: (size) => set({ gridSize: Math.max(1, size) }),
   setSmartGuides: (guides) => set({ smartGuides: guides }),
 
   // Helpers
