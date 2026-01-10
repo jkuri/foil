@@ -5,9 +5,10 @@ import { NumberInput } from "@/components/shared/number-input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { getAvailableWeights, getFont, getFontAscender } from "@/lib/text-renderer";
 import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/store";
-import type { CanvasElement, LineElement, RectElement } from "@/types";
+import type { CanvasElement, LineElement, RectElement, TextElement } from "@/types";
 import { LineMarkerSelect } from "./line-marker-select";
 
 function SectionHeader({ title }: { title: string }) {
@@ -443,48 +444,126 @@ export function PropertiesPanel() {
 
             {/* Font Family */}
             <Select
-              value={(selectedElement as import("@/types").TextElement).fontFamily}
-              onValueChange={(val) => updateElement(selectedElement.id, { fontFamily: val })}
+              value={(selectedElement as TextElement).fontFamily || "Inter, sans-serif"}
+              onValueChange={async (newFontFamily) => {
+                const textEl = selectedElement as TextElement;
+                const { fontSize, fontFamily: oldFontFamily, fontWeight, y } = textEl;
+                const oldWeight = String(fontWeight || "400");
+
+                // Check if current weight is available in new font
+                const availableWeights = getAvailableWeights(newFontFamily || "Inter, sans-serif");
+                let newWeight = oldWeight;
+                if (!availableWeights.includes(newWeight)) {
+                  // Fallback to 400 if available, otherwise first available
+                  newWeight = availableWeights.includes("400") ? "400" : availableWeights[0] || "400";
+                }
+
+                // Get old and new fonts (preloaded at app startup)
+                const oldFonts = await getFont(oldFontFamily, oldWeight);
+                const newFonts = await getFont(newFontFamily || "Inter, sans-serif", newWeight);
+                const oldFont = oldFonts?.[0];
+                const newFont = newFonts?.[0];
+
+                if (oldFont && newFont) {
+                  // Use font ascender to maintain visual position
+                  const oldAscender = getFontAscender(oldFont, fontSize);
+                  const newAscender = getFontAscender(newFont, fontSize);
+
+                  // Adjust y to maintain the same visual baseline position
+                  // newY = oldY + oldAscender - newAscender
+                  const newY = Number(y) + (oldAscender - newAscender);
+
+                  updateElement(selectedElement.id, {
+                    fontFamily: newFontFamily,
+                    fontWeight: newWeight,
+                    y: newY,
+                  });
+                } else {
+                  // Fallback: just update font family and weight
+                  updateElement(selectedElement.id, {
+                    fontFamily: newFontFamily,
+                    fontWeight: newWeight,
+                  });
+                }
+              }}
             >
               <SelectTrigger className="h-7 w-full text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Inter, sans-serif">Inter</SelectItem>
-                <SelectItem value="Arial, sans-serif">Arial</SelectItem>
-                <SelectItem value="Helvetica, sans-serif">Helvetica</SelectItem>
-                <SelectItem value="Times New Roman, serif">Times New Roman</SelectItem>
-                <SelectItem value="Georgia, serif">Georgia</SelectItem>
-                <SelectItem value="Courier New, monospace">Courier New</SelectItem>
-                <SelectItem value="'Comic Sans MS', cursive">Comic Sans MS</SelectItem>
+                <SelectItem value="Roboto, sans-serif">Roboto</SelectItem>
+                <SelectItem value="Lato, sans-serif">Lato</SelectItem>
+                <SelectItem value="Geist Sans, sans-serif">Geist</SelectItem>
+                <SelectItem value="Noto Sans, sans-serif">Noto Sans</SelectItem>
+                <SelectItem value="Oswald, sans-serif">Oswald</SelectItem>
+                <SelectItem value="Raleway, sans-serif">Raleway</SelectItem>
+                <SelectItem value="Nunito, sans-serif">Nunito</SelectItem>
+                <SelectItem value="Nunito Sans, sans-serif">Nunito Sans</SelectItem>
+                <SelectItem value="Rubik, sans-serif">Rubik</SelectItem>
               </SelectContent>
             </Select>
 
             {/* Font Size, Weight, Line Height - inline row */}
             <div className="grid grid-cols-3 gap-1">
               <NumberInput
-                value={(selectedElement as import("@/types").TextElement).fontSize}
+                value={(selectedElement as TextElement).fontSize || 16}
                 onChange={(v) => updateElement(selectedElement.id, { fontSize: v })}
                 step={1}
                 className="h-7"
               />
               <Select
-                value={String((selectedElement as import("@/types").TextElement).fontWeight || "400")}
-                onValueChange={(val) => updateElement(selectedElement.id, { fontWeight: val })}
+                value={String((selectedElement as TextElement).fontWeight || "400")}
+                onValueChange={async (val) => {
+                  const textEl = selectedElement as TextElement;
+                  const oldWeight = String(textEl.fontWeight || "400");
+                  if (val === oldWeight) return;
+
+                  // Load new font and adjust Y position to prevent jumping
+                  const currentFonts = await getFont(textEl.fontFamily, oldWeight);
+                  const newFonts = await getFont(textEl.fontFamily || "Inter, sans-serif", val || "400");
+                  const currentFont = currentFonts?.[0];
+                  const newFont = newFonts?.[0];
+
+                  if (currentFont && newFont) {
+                    const fontSize = Number(textEl.fontSize);
+                    const oldAscender = getFontAscender(currentFont, fontSize);
+                    const newAscender = getFontAscender(newFont, fontSize);
+                    const diff = oldAscender - newAscender;
+
+                    updateElement(textEl.id, {
+                      fontWeight: val,
+                      y: Number(textEl.y) + diff,
+                    });
+                  } else {
+                    updateElement(textEl.id, { fontWeight: val });
+                  }
+                }}
               >
                 <SelectTrigger className="h-7 w-full text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="100">Thin</SelectItem>
-                  <SelectItem value="200">Extra Light</SelectItem>
-                  <SelectItem value="300">Light</SelectItem>
-                  <SelectItem value="400">Regular</SelectItem>
-                  <SelectItem value="500">Medium</SelectItem>
-                  <SelectItem value="600">Semi Bold</SelectItem>
-                  <SelectItem value="700">Bold</SelectItem>
-                  <SelectItem value="800">Extra Bold</SelectItem>
-                  <SelectItem value="900">Black</SelectItem>
+                  {getAvailableWeights((selectedElement as TextElement).fontFamily || "Inter, sans-serif").map(
+                    (w: string) => {
+                      const labels: Record<string, string> = {
+                        "100": "Thin",
+                        "200": "Extra Light",
+                        "300": "Light",
+                        "400": "Regular",
+                        "500": "Medium",
+                        "600": "Semi Bold",
+                        "700": "Bold",
+                        "800": "Extra Bold",
+                        "900": "Black",
+                      };
+                      return (
+                        <SelectItem key={w} value={w}>
+                          {labels[w] || w}
+                        </SelectItem>
+                      );
+                    },
+                  )}
                 </SelectContent>
               </Select>
               <NumberInput value={120} onChange={() => {}} step={1} className="h-7" disabled />
@@ -496,7 +575,7 @@ export function PropertiesPanel() {
                 type="button"
                 onClick={() => updateElement(selectedElement.id, { textAnchor: "start" })}
                 className={`flex h-7 flex-1 items-center justify-center rounded border text-xs ${
-                  ((selectedElement as import("@/types").TextElement).textAnchor || "start") === "start"
+                  ((selectedElement as TextElement).textAnchor || "start") === "start"
                     ? "border-blue-500 bg-blue-50"
                     : "border-border hover:bg-muted"
                 }`}
@@ -507,7 +586,7 @@ export function PropertiesPanel() {
                 type="button"
                 onClick={() => updateElement(selectedElement.id, { textAnchor: "middle" })}
                 className={`flex h-7 flex-1 items-center justify-center rounded border text-xs ${
-                  ((selectedElement as import("@/types").TextElement).textAnchor || "start") === "middle"
+                  ((selectedElement as TextElement).textAnchor || "start") === "middle"
                     ? "border-blue-500 bg-blue-50"
                     : "border-border hover:bg-muted"
                 }`}
@@ -518,7 +597,7 @@ export function PropertiesPanel() {
                 type="button"
                 onClick={() => updateElement(selectedElement.id, { textAnchor: "end" })}
                 className={`flex h-7 flex-1 items-center justify-center rounded border text-xs ${
-                  ((selectedElement as import("@/types").TextElement).textAnchor || "start") === "end"
+                  ((selectedElement as TextElement).textAnchor || "start") === "end"
                     ? "border-blue-500 bg-blue-50"
                     : "border-border hover:bg-muted"
                 }`}

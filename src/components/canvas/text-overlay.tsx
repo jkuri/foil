@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+import type opentype from "opentype.js";
+import { useEffect, useRef, useState } from "react";
+import { drawTextWithOpenType, getFont, preloadFonts } from "@/lib/text-renderer";
 import { useCanvasStore } from "@/store";
 import type { TextElement } from "@/types";
 
@@ -7,18 +9,27 @@ interface TextOverlayProps {
   transform: { x: number; y: number; scale: number };
 }
 
+// Cache loaded fonts by their key (supports arrays of fonts for composite handling)
+const loadedFonts = new Map<string, opentype.Font[]>();
+
 /**
  * Canvas 2D overlay for rendering text elements
- * WebGL doesn't handle text rendering well, so we use a separate 2D canvas
+ * Uses OpenType.js for rendering to ensure consistency with outline conversion
  */
 export function TextOverlay({ canvasRef, transform }: TextOverlayProps) {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const elements = useCanvasStore((s) => s.elements);
   const isEditingText = useCanvasStore((s) => s.isEditingText);
   const editingTextId = useCanvasStore((s) => s.editingTextId);
+  const [fontsReady, setFontsReady] = useState(false);
+
+  // Preload fonts on mount
+  useEffect(() => {
+    preloadFonts().then(() => setFontsReady(true));
+  }, []);
 
   useEffect(() => {
-    if (!overlayRef.current || !canvasRef) return;
+    if (!overlayRef.current || !canvasRef || !fontsReady) return;
 
     const overlay = overlayRef.current;
     const ctx = overlay.getContext("2d")!;
@@ -43,45 +54,75 @@ export function TextOverlay({ canvasRef, transform }: TextOverlayProps) {
     // Render text elements
     const textElements = elements.filter((e) => e.type === "text") as TextElement[];
 
-    for (const textEl of textElements) {
-      // Skip if this text is being edited (editor will render it)
-      if (isEditingText && editingTextId === textEl.id) {
-        continue;
+    // Render each text element asynchronously to load fonts
+    const renderTexts = async () => {
+      for (const textEl of textElements) {
+        // Skip if this text is being edited (editor will render it)
+        if (isEditingText && editingTextId === textEl.id) {
+          continue;
+        }
+
+        if (textEl.visible === false) continue;
+
+        const { x, y, text, fontSize, fontFamily, fontWeight, fill, opacity, rotation } = textEl;
+
+        // Get font
+        const fontKey = `${fontFamily}-${fontWeight || "400"}`;
+        let fonts = loadedFonts.get(fontKey);
+
+        if (!fonts) {
+          const loaded = await getFont(fontFamily, fontWeight || "400");
+          if (loaded) {
+            fonts = loaded;
+            loadedFonts.set(fontKey, fonts);
+          }
+        }
+
+        if (!fonts || fonts.length === 0) {
+          // Fallback to native text rendering if font loading fails
+          ctx.save();
+          if (rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(rotation);
+            ctx.translate(-x, -y);
+          }
+          ctx.font = `${fontWeight || "normal"} ${fontSize}px ${fontFamily}`;
+          ctx.textBaseline = "alphabetic";
+          ctx.globalAlpha = opacity ?? 1;
+          if (fill) {
+            ctx.fillStyle = typeof fill === "string" ? fill : "#000000";
+            ctx.fillText(text, x, y);
+          }
+          ctx.restore();
+          continue;
+        }
+
+        ctx.save();
+
+        // Apply rotation
+        if (rotation) {
+          ctx.translate(x, y);
+          ctx.rotate(rotation);
+          ctx.translate(-x, -y);
+        }
+
+        ctx.globalAlpha = opacity ?? 1;
+
+        // Draw text using OpenType.js - same as outline conversion!
+        const fillColor = fill ? (typeof fill === "string" ? fill : "#000000") : null;
+
+        drawTextWithOpenType(ctx, fonts, text, x, y, fontSize, {
+          fill: fillColor,
+        });
+
+        ctx.restore();
       }
+    };
 
-      if (textEl.visible === false) continue;
-
-      const { x, y, text, fontSize, fontFamily, fontWeight, textAnchor, fill, opacity, rotation } = textEl;
-
-      ctx.save();
-
-      // Apply rotation
-      if (rotation) {
-        ctx.translate(x, y);
-        ctx.rotate(rotation);
-        ctx.translate(-x, -y);
-      }
-
-      // Set text styles
-      ctx.font = `${fontWeight || "normal"} ${fontSize}px ${fontFamily}`;
-      ctx.textBaseline = "alphabetic";
-      ctx.textAlign = (textAnchor as CanvasTextAlign) || "start";
-      ctx.globalAlpha = opacity ?? 1;
-
-      // Set fill color
-      if (fill) {
-        ctx.fillStyle = typeof fill === "string" ? fill : "#000000";
-        ctx.fillText(text, x, y);
-      }
-
-      // Note: stroke for text is typically not used in design tools
-      // If needed, it can be added here similar to fill
-
-      ctx.restore();
-    }
+    renderTexts();
 
     ctx.restore();
-  }, [canvasRef, elements, transform, isEditingText, editingTextId]);
+  }, [canvasRef, elements, transform, isEditingText, editingTextId, fontsReady]);
 
   return (
     <canvas

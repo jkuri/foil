@@ -62,7 +62,7 @@ export function TextEditor({ worldToScreen }: TextEditorProps) {
     e.stopPropagation();
   };
 
-  const finishEditing = () => {
+  const finishEditing = async () => {
     if (!inputRef.current || !textElement) return;
 
     const newText = inputRef.current.textContent || "";
@@ -70,8 +70,8 @@ export function TextEditor({ worldToScreen }: TextEditorProps) {
     // Update text content
     updateElement(textElement.id, { text: newText });
 
-    // Calculate and update bounds
-    const bounds = calculateTextBounds({ ...textElement, text: newText });
+    // Calculate and update bounds (async)
+    const bounds = await calculateTextBounds({ ...textElement, text: newText });
     updateElement(textElement.id, { bounds });
 
     setIsEditingText(false);

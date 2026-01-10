@@ -6,6 +6,7 @@
  */
 
 import earcut from "earcut";
+import polygonClipping from "polygon-clipping";
 import { SVGPathData } from "svg-pathdata";
 
 // Re-export our simplified command types for internal use
@@ -64,14 +65,7 @@ export function parsePath(d: string): PathCommand[] {
           lastY = cmd.y;
           break;
         case SVGPathData.SMOOTH_CURVE_TO:
-          // helper to calculate reflection control point would be needed for true S support if not normalized
-          // but normalizeST converts this to C, so this might strictly not be hit if normalizeST works as expected.
-          // However, if it IS hit, normalizeST converts S to C, so we should get CURVE_TO.
-          // If we do get SMOOTH_CURVE_TO, it implies normalizeST didn't convert it or we have to handle it.
-          // normalizeST docs say it converts S -> C.
-          // Let's assume correct conversion or fall back to treating as C with implied control point?
-          // Actually, svg-pathdata normalizeST() converts S to C. So we shouldn't see S here.
-          // But to be safe, we push C.
+          // Should be converted to C by normalizeST
           commands.push({ type: "C", args: [cmd.x2, cmd.y2, cmd.x2, cmd.y2, cmd.x, cmd.y] });
           lastX = cmd.x;
           lastY = cmd.y;
@@ -339,45 +333,50 @@ export function pathToStrokeVertices(commands: PathCommand[], segmentsPerCurve =
 
 /**
  * Tessellate path commands into triangulated vertices for WebGL fill rendering
- * Uses a simple polygon triangulation (earcut-like algorithm)
+ * Uses polygon-clipping to resolve geometry self-intersections and overlaps
  */
 export function pathToFillVertices(commands: PathCommand[], segmentsPerCurve = 16): number[] {
-  // First, flatten the path to a polygon with proper hole detection
-  const polygon: number[] = [];
-  const holes: number[] = [];
+  // 1. Tessellate path commands into separate rings (contours)
+  const rings: [number, number][][] = [];
+  let currentRing: [number, number][] = [];
   let currentX = 0;
   let currentY = 0;
   let startX = 0;
   let startY = 0;
-  let isFirstSubpath = true;
+
+  const flushRing = () => {
+    if (currentRing.length > 0) {
+      const first = currentRing[0];
+      const last = currentRing[currentRing.length - 1];
+      if (Math.abs(first[0] - last[0]) > 0.001 || Math.abs(first[1] - last[1]) > 0.001) {
+        currentRing.push(first);
+      }
+      rings.push(currentRing);
+      currentRing = [];
+    }
+  };
 
   for (const cmd of commands) {
     switch (cmd.type) {
       case "M":
-        // Each M command after the first starts a new subpath (hole)
-        if (!isFirstSubpath && polygon.length > 0) {
-          // Register the start of this new subpath as a hole
-          // The hole index is the number of vertices (polygon.length / 2) BEFORE adding the new point
-          holes.push(polygon.length / 2);
-        }
-        isFirstSubpath = false;
+        flushRing();
         currentX = cmd.args[0];
         currentY = cmd.args[1];
         startX = currentX;
         startY = currentY;
-        polygon.push(currentX, currentY);
+        currentRing.push([currentX, currentY]);
         break;
       case "L":
         currentX = cmd.args[0];
         currentY = cmd.args[1];
-        polygon.push(currentX, currentY);
+        currentRing.push([currentX, currentY]);
         break;
       case "C": {
         const [x1, y1, x2, y2, x, y] = cmd.args;
         for (let i = 1; i <= segmentsPerCurve; i++) {
           const t = i / segmentsPerCurve;
           const [px, py] = cubicBezierPoint(currentX, currentY, x1, y1, x2, y2, x, y, t);
-          polygon.push(px, py);
+          currentRing.push([px, py]);
         }
         currentX = x;
         currentY = y;
@@ -388,41 +387,51 @@ export function pathToFillVertices(commands: PathCommand[], segmentsPerCurve = 1
         for (let i = 1; i <= segmentsPerCurve; i++) {
           const t = i / segmentsPerCurve;
           const [px, py] = quadraticBezierPoint(currentX, currentY, qx1, qy1, qx, qy, t);
-          polygon.push(px, py);
+          currentRing.push([px, py]);
         }
         currentX = qx;
         currentY = qy;
         break;
       }
       case "Z":
-        // Close path - handled by triangulation
         currentX = startX;
         currentY = startY;
         break;
     }
   }
+  flushRing();
 
-  // Triangulate using earcut (handles complex polygons and holes)
-  if (polygon.length < 6) return [];
+  if (rings.length === 0) return [];
 
-  // Use the collected hole indices directly - earcut expects indices of the first vertex of each hole
-  const indices = earcut(polygon, holes.length > 0 ? holes : undefined);
+  // 2. Resolve complex geometry (self-intersections, overlaps) using polygon-clipping
+  const unioned = polygonClipping.union(rings.map((r) => [r]));
 
-  // Convert triangle indices to flat vertex array
-  const vertices: number[] = [];
-  for (let i = 0; i < indices.length; i += 3) {
-    const i0 = indices[i];
-    const i1 = indices[i + 1];
-    const i2 = indices[i + 2];
-    vertices.push(
-      polygon[i0 * 2],
-      polygon[i0 * 2 + 1],
-      polygon[i1 * 2],
-      polygon[i1 * 2 + 1],
-      polygon[i2 * 2],
-      polygon[i2 * 2 + 1],
-    );
+  // 3. Triangulate result
+  const allVertices: number[] = [];
+
+  for (const poly of unioned) {
+    const flatCoords: number[] = [];
+    const holeIndices: number[] = [];
+
+    // Add outer ring
+    for (const [x, y] of poly[0]) {
+      flatCoords.push(x, y);
+    }
+
+    // Add holes
+    for (let i = 1; i < poly.length; i++) {
+      holeIndices.push(flatCoords.length / 2);
+      for (const [x, y] of poly[i]) {
+        flatCoords.push(x, y);
+      }
+    }
+
+    const indices = earcut(flatCoords, holeIndices);
+    for (let i = 0; i < indices.length; i++) {
+      const idx = indices[i];
+      allVertices.push(flatCoords[idx * 2], flatCoords[idx * 2 + 1]);
+    }
   }
 
-  return vertices;
+  return allVertices;
 }

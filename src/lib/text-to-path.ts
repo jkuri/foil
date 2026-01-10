@@ -1,5 +1,5 @@
-import opentype from "opentype.js";
-import type { GroupElement, PathElement, TextElement } from "@/types";
+import { type GroupElement, getFillColor, type PathElement, type TextElement } from "@/types";
+import { forEachGlyphCompound, getFont } from "./text-renderer";
 
 // Return type for text conversion
 export interface TextConversionResult {
@@ -7,43 +7,29 @@ export interface TextConversionResult {
   paths: PathElement[];
 }
 
-// Map fonts to their file paths (using WOFF format)
-const FONT_FILES: Record<string, Record<string, string>> = {
-  Inter: {
-    "400": "/fonts/Inter-Regular.woff",
-    normal: "/fonts/Inter-Regular.woff",
-    "700": "/fonts/Inter-Bold.woff",
-    bold: "/fonts/Inter-Bold.woff",
-  },
-};
-
 /**
  * Convert text to actual glyph outlines using opentype.js
- * Processes each glyph individually with proper kerning using forEachGlyph
+ * Uses the same font loading as text-renderer.ts to ensure consistency
  */
 export async function convertTextToPath(textElement: TextElement): Promise<TextConversionResult> {
-  const { text, fontSize, fontFamily, fontWeight = "400", x, y, fill, stroke, opacity, rotation, name } = textElement;
+  const { text, fontFamily, fontWeight = "400", fill, stroke, opacity, rotation, name } = textElement;
+  // Ensure numeric values are actually numbers (could be strings from some UI components)
+  const fontSize = Number(textElement.fontSize);
+  const x = Number(textElement.x);
+  const y = Number(textElement.y);
 
-  // Extract font name
-  const fontName = fontFamily.split(",")[0].trim().replace(/['"]/g, "");
-  const weight = String(fontWeight);
+  // Load the font(s) using shared utility
+  const fonts = await getFont(fontFamily, fontWeight);
 
-  // Get font file path
-  let fontPath = FONT_FILES[fontName]?.[weight] || FONT_FILES[fontName]?.["400"];
-
-  if (!fontPath) {
-    fontPath = "/fonts/Inter-Regular.woff";
+  if (!fonts || fonts.length === 0) {
+    throw new Error(`Failed to load font: ${fontFamily}`);
   }
 
-  // Load the font
-  const font = await opentype.load(fontPath);
+  // Collect glyph information with proper kerning using composite logic
+  const glyphInfos: { glyph: opentype.Glyph; x: number; font: opentype.Font }[] = [];
 
-  // Collect glyph information with proper kerning using forEachGlyph
-  const glyphInfos: { glyph: opentype.Glyph; x: number }[] = [];
-
-  // forEachGlyph handles kerning automatically and returns the advance width
-  font.forEachGlyph(text, x, y, fontSize, { kerning: true }, (glyph, glyphX) => {
-    glyphInfos.push({ glyph, x: glyphX });
+  forEachGlyphCompound(fonts, text, x, y, fontSize, (glyph, glyphX, _glyphY, font) => {
+    glyphInfos.push({ glyph, x: glyphX, font });
   });
 
   // Create a separate path element for each glyph
@@ -81,7 +67,7 @@ export async function convertTextToPath(textElement: TextElement): Promise<TextC
         height: bbox.y2 - bbox.y1,
       },
       rotation: 0,
-      fill: fill || "#000000",
+      fill: getFillColor(fill, "#000000"),
       stroke,
       opacity: opacity ?? 1,
     };
@@ -108,25 +94,43 @@ export async function convertTextToPath(textElement: TextElement): Promise<TextC
 }
 
 /**
- * Calculate accurate text bounds using Canvas API
+ * Calculate accurate text bounds using OpenType.js
  */
-export function calculateTextBounds(textElement: TextElement): { x: number; y: number; width: number; height: number } {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d")!;
+export async function calculateTextBounds(
+  textElement: TextElement,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  const { text, fontFamily, fontWeight = "400" } = textElement;
+  const fontSize = Number(textElement.fontSize);
+  const x = Number(textElement.x);
+  const y = Number(textElement.y);
 
-  const { text, fontSize, fontFamily, fontWeight = "normal", x, y } = textElement;
+  const fonts = await getFont(fontFamily, fontWeight);
 
-  ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-  const metrics = ctx.measureText(text);
+  if (!fonts || fonts.length === 0) {
+    return { x, y, width: 0, height: 0 };
+  }
 
-  const width = metrics.width;
-  const height = fontSize * 1.2;
-  const baseline = fontSize * 0.2;
+  // Use shared logic if possible, or manual min/max
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  forEachGlyphCompound(fonts, text, x, y, fontSize, (glyph, gx, gy) => {
+    const path = glyph.getPath(gx, gy, fontSize);
+    const bbox = path.getBoundingBox();
+    if (bbox.x1 < minX) minX = bbox.x1;
+    if (bbox.y1 < minY) minY = bbox.y1;
+    if (bbox.x2 > maxX) maxX = bbox.x2;
+    if (bbox.y2 > maxY) maxY = bbox.y2;
+  });
+
+  if (minX === Infinity) return { x, y, width: 0, height: 0 };
 
   return {
-    x,
-    y: y - height + baseline,
-    width,
-    height,
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
   };
 }
