@@ -240,7 +240,7 @@ export function ColorPicker({ color, onChange, className, opacity = 1, onOpacity
         <div className="absolute inset-0 bg-linear-to-r from-white to-transparent" />
         <div className="absolute inset-0 bg-linear-to-t from-black to-transparent" />
         <div
-          className="-translate-x-1/2 -translate-y-1/2 pointer-events-none absolute h-3 w-3 rounded-full border-2 border-white shadow-sm ring-1 ring-black/20"
+          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-sm ring-1 ring-black/20"
           style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%` }}
         />
       </div>
@@ -263,7 +263,7 @@ export function ColorPicker({ color, onChange, className, opacity = 1, onOpacity
             }}
           >
             <div
-              className="-translate-x-1/2 pointer-events-none absolute top-0 h-full w-3 rounded-full border-2 border-white shadow-sm ring-1 ring-black/20"
+              className="pointer-events-none absolute top-0 h-full w-3 -translate-x-1/2 rounded-full border-2 border-white shadow-sm ring-1 ring-black/20"
               style={{ left: `${(hsv.h / 360) * 100}%` }}
             />
           </div>
@@ -291,7 +291,7 @@ export function ColorPicker({ color, onChange, className, opacity = 1, onOpacity
               style={{ background: `linear-gradient(to right, transparent, ${color})` }}
             />
             <div
-              className="-translate-x-1/2 pointer-events-none absolute top-0 h-full w-3 rounded-full border-2 border-white shadow-sm ring-1 ring-black/20"
+              className="pointer-events-none absolute top-0 h-full w-3 -translate-x-1/2 rounded-full border-2 border-white shadow-sm ring-1 ring-black/20"
               style={{ left: `${opacity * 100}%` }}
             />
           </div>

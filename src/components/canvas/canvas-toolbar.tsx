@@ -278,7 +278,7 @@ export function CanvasToolbar() {
     <>
       {/* Hidden file input for SVG import */}
       <input ref={fileInputRef} type="file" accept=".svg,image/svg+xml" className="hidden" onChange={handleImportSVG} />
-      <div className="-translate-x-1/2 fixed bottom-6 left-1/2 flex items-center gap-1 rounded-xl border bg-background/80 p-1.5 shadow-2xl backdrop-blur-md">
+      <div className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border bg-background/80 p-1.5 shadow-2xl backdrop-blur-md">
         {/* Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger className="flex size-8 items-center justify-center rounded-md outline-none ring-offset-background transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
