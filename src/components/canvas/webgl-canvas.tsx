@@ -262,7 +262,7 @@ export function WebGLCanvas({ fontsReady = false }: WebGLCanvasProps) {
       e.preventDefault();
     };
 
-    container.addEventListener("wheel", handleWheel, { passive: false });
+    canvas.addEventListener("wheel", handleWheel, { passive: false });
     canvas.addEventListener("mousedown", handleMouseDown);
     canvas.addEventListener("contextmenu", preventContextMenu);
     canvas.addEventListener("dragover", handleDragOver);
@@ -271,7 +271,7 @@ export function WebGLCanvas({ fontsReady = false }: WebGLCanvasProps) {
     window.addEventListener("mouseup", onMouseUp);
 
     return () => {
-      container.removeEventListener("wheel", handleWheel);
+      canvas.removeEventListener("wheel", handleWheel);
       canvas.removeEventListener("mousedown", handleMouseDown);
       canvas.removeEventListener("contextmenu", preventContextMenu);
       canvas.removeEventListener("dragover", handleDragOver);
