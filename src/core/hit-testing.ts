@@ -93,10 +93,23 @@ export function getRotatedCorners(element: Shape): { x: number; y: number }[] {
       });
     }
     case "text": {
-      const textWidth = element.text.length * element.fontSize * 0.6;
-      const textHeight = element.fontSize * 1.2;
-      const x = element.x;
-      const y = element.y - element.fontSize;
+      let textWidth: number;
+      let textHeight: number;
+      let x: number;
+      let y: number;
+
+      if (element.bounds) {
+        textWidth = element.bounds.width;
+        textHeight = element.bounds.height;
+        x = element.x + element.bounds.x;
+        y = element.y + element.bounds.y;
+      } else {
+        textWidth = element.text.length * element.fontSize * 0.6;
+        textHeight = element.fontSize * 1.2;
+        x = element.x;
+        y = element.y - element.fontSize;
+      }
+
       const centerX = x + textWidth / 2;
       const centerY = y + textHeight / 2;
       const cos = Math.cos(element.rotation);
@@ -495,7 +508,6 @@ export function getShapesInBox(
   return elements.filter((element) => {
     if (element.visible === false) return false;
     if (element.type === "group") return false;
-    if (element.parentId) return false; // Don't select children directly, select parent
 
     // Special case for lines: check intersection with box
     if (element.type === "line") {
