@@ -1,6 +1,7 @@
 import type * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { COLOR_PICKER_PRESETS } from "@/lib/colors";
 import { cn } from "@/lib/utils";
 
 interface ColorPickerProps {
@@ -325,26 +326,9 @@ export function ColorPicker({ color, onChange, className, opacity = 1, onOpacity
         </div>
       </div>
 
-      {/* Predefined Colors (Simple Palette) */}
+      {/* Predefined Colors (Tailwind Palette) */}
       <div className="grid grid-cols-8 gap-1 border-t pt-2">
-        {[
-          "#000000",
-          "#ffffff",
-          "#ef4444",
-          "#f97316",
-          "#f59e0b",
-          "#84cc16",
-          "#22c55e",
-          "#10b981",
-          "#06b6d4",
-          "#0ea5e9",
-          "#3b82f6",
-          "#6366f1",
-          "#8b5cf6",
-          "#d946ef",
-          "#f43f5e",
-          "#881337",
-        ].map((c) => (
+        {COLOR_PICKER_PRESETS.map((c) => (
           <button
             key={c}
             type="button"

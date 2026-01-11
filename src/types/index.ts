@@ -108,6 +108,7 @@ export type Fill = string | { ref: string; type: "gradient" | "pattern" } | null
 export type Stroke = {
   color: string | { ref: string; type: "gradient" };
   width: number;
+  opacity?: number; // Stroke-specific opacity (0-1)
   dashArray?: number[]; // e.g., [5, 5]
   lineCap?: "butt" | "round" | "square";
 } | null;
@@ -118,8 +119,9 @@ interface BaseElement {
   name: string;
   rotation: number; // radians
   fill: Fill;
+  fillOpacity?: number; // Fill-specific opacity (0-1), defaults to 1
   stroke: Stroke;
-  opacity: number; // 0-1
+  opacity: number; // Overall element opacity (0-1)
   locked?: boolean;
   visible?: boolean;
   parentId?: string; // Reference to parent group

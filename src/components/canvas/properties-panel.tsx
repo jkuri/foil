@@ -685,7 +685,13 @@ export function PropertiesPanel() {
                 <ColorInput
                   className="flex-1"
                   value={typeof selectedElement.fill === "string" ? selectedElement.fill : "#000000"}
-                  onChange={(hex) => updateElement(selectedElement.id, { fill: hex })}
+                  opacity={selectedElement.fillOpacity ?? 1}
+                  onChange={(hex, newOpacity) => {
+                    updateElement(selectedElement.id, {
+                      fill: hex,
+                      ...(newOpacity !== undefined && { fillOpacity: newOpacity }),
+                    });
+                  }}
                 />
                 <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
                   <EyeIcon />
@@ -736,12 +742,16 @@ export function PropertiesPanel() {
                   <ColorInput
                     className="flex-1"
                     value={typeof selectedElement.stroke.color === "string" ? selectedElement.stroke.color : "#000000"}
-                    opacity={1}
-                    onChange={(color) =>
+                    opacity={selectedElement.stroke.opacity ?? 1}
+                    onChange={(color, newOpacity) => {
                       updateElement(selectedElement.id, {
-                        stroke: { ...selectedElement.stroke!, color },
-                      })
-                    }
+                        stroke: {
+                          ...selectedElement.stroke!,
+                          color,
+                          ...(newOpacity !== undefined && { opacity: newOpacity }),
+                        },
+                      });
+                    }}
                   />
                   <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
                     <EyeIcon />

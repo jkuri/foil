@@ -511,7 +511,7 @@ export class WebGLRenderer {
     // Draw fill
     if (fill) {
       const color = this.cssColorToRGBA(fill);
-      color[3] *= opacity;
+      color[3] *= (element.fillOpacity ?? 1) * opacity;
       const vertices = new Float32Array([
         x,
         y,
@@ -537,7 +537,7 @@ export class WebGLRenderer {
     // Draw stroke
     if (stroke) {
       const strokeColor = this.cssColorToRGBA(stroke.color);
-      strokeColor[3] *= opacity;
+      strokeColor[3] *= (stroke.opacity ?? 1) * opacity;
       this.resetRotation();
       gl.uniform4f(gl.getUniformLocation(this.shapeProgram!, "u_color"), ...strokeColor);
 
@@ -557,7 +557,7 @@ export class WebGLRenderer {
     const centerY = y + height / 2;
 
     const color = fill ? this.cssColorToRGBA(fill) : [0, 0, 0, 0];
-    color[3] *= opacity;
+    color[3] *= (element.fillOpacity ?? 1) * opacity;
 
     // Define corner centers
     const cNW = { x: x + r, y: y + r };
@@ -661,7 +661,7 @@ export class WebGLRenderer {
 
     if (stroke) {
       const sColor = this.cssColorToRGBA(stroke.color);
-      sColor[3] *= opacity;
+      sColor[3] *= (stroke.opacity ?? 1) * opacity;
 
       // We need to draw lines and arcs.
       // Unlike fill, we can't use u_rotation easily with drawLineBetweenPoints because it resets rotation?
@@ -725,7 +725,7 @@ export class WebGLRenderer {
     // Draw fill
     if (fill) {
       const color = this.cssColorToRGBA(fill);
-      color[3] *= opacity;
+      color[3] *= (element.fillOpacity ?? 1) * opacity;
 
       // Create triangle fan vertices
       const vertices: number[] = [];
@@ -759,7 +759,7 @@ export class WebGLRenderer {
     // Draw stroke
     if (stroke) {
       const strokeColor = this.cssColorToRGBA(stroke.color);
-      strokeColor[3] *= opacity;
+      strokeColor[3] *= (stroke.opacity ?? 1) * opacity;
       this.resetRotation();
       gl.uniform4f(gl.getUniformLocation(this.shapeProgram!, "u_color"), ...strokeColor);
       gl.uniform2f(gl.getUniformLocation(this.shapeProgram!, "u_offset"), 0, 0);
@@ -798,7 +798,7 @@ export class WebGLRenderer {
 
     const gl = this.gl;
     const color = this.cssColorToRGBA(stroke.color);
-    color[3] *= opacity;
+    color[3] *= (stroke.opacity ?? 1) * opacity;
 
     this.resetRotation();
     gl.uniform4f(gl.getUniformLocation(this.shapeProgram!, "u_color"), ...color);
@@ -1073,7 +1073,7 @@ export class WebGLRenderer {
     // Draw fill
     if (fill && cached.vertices.length >= 6) {
       const color = this.cssColorToRGBA(fill);
-      color[3] *= opacity;
+      color[3] *= (element.fillOpacity ?? 1) * opacity;
 
       gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, cached.vertices, gl.STATIC_DRAW);
@@ -1087,7 +1087,7 @@ export class WebGLRenderer {
     if (stroke && cached.strokeVertices.length >= 6) {
       const strokeColor = typeof stroke.color === "string" ? stroke.color : "#000000";
       const color = this.cssColorToRGBA(strokeColor);
-      color[3] *= opacity;
+      color[3] *= (stroke.opacity ?? 1) * opacity;
 
       gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, cached.strokeVertices, gl.STATIC_DRAW);
