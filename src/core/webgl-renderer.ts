@@ -4,6 +4,7 @@ import type {
   BoundingBox,
   CanvasElement,
   EllipseElement,
+  ImageElement,
   LineElement,
   PathElement,
   RectElement,
@@ -319,27 +320,18 @@ export class WebGLRenderer {
       const selectedShapes = this.collectShapes(selectedElements, elements);
 
       if (selectionBox) {
-        // Marquee selection active: only draw outlines, no handles (skip text)
+        // Marquee selection active: only draw outlines, no handles
         for (const shape of selectedShapes) {
-          if (shape.type !== "text") {
-            this.drawShapeOutline(shape, scale);
-          }
+          this.drawShapeOutline(shape, scale);
         }
       } else {
-        if (
-          selectedShapes.length === 1 &&
-          selectedElements.length === 1 &&
-          selectedElements[0].type !== "group" &&
-          selectedElements[0].type !== "text"
-        ) {
-          // Single shape: draw rotated outline with handles (skip text elements)
+        if (selectedShapes.length === 1 && selectedElements.length === 1 && selectedElements[0].type !== "group") {
+          // Single shape: draw rotated outline with handles
           this.drawShapeOutlineWithHandles(selectedShapes[0], scale);
         } else if (selectedShapes.length > 0) {
-          // Multiple shapes or group: draw individual outlines + bounding box (skip text)
+          // Multiple shapes or group: draw individual outlines + bounding box
           for (const shape of selectedShapes) {
-            if (shape.type !== "text") {
-              this.drawShapeOutline(shape, scale);
-            }
+            this.drawShapeOutline(shape, scale);
           }
           const bounds = this.calculateBoundingBox(selectedShapes);
           this.drawBoundingBoxWithHandles(bounds, true, scale);
@@ -1203,8 +1195,63 @@ export class WebGLRenderer {
           y: centerY + (corner.x - centerX) * sin + (corner.y - centerY) * cos,
         }));
       }
+      case "text": {
+        let width: number;
+        let height: number;
+        let x: number;
+        let y: number;
+
+        const textShape = shape as TextElement;
+
+        // Use stored bounds if available, otherwise estimate
+        if (textShape.bounds) {
+          width = textShape.bounds.width;
+          height = textShape.bounds.height;
+          // bounds in TextElement are relative to x,y?
+          // Based on webgl-canvas.tsx: x = element.x + element.bounds.x
+          x = textShape.x + textShape.bounds.x;
+          y = textShape.y + textShape.bounds.y;
+        } else {
+          width = textShape.text.length * textShape.fontSize * 0.6;
+          height = textShape.fontSize * 1.2;
+          x = textShape.x;
+          y = textShape.y - textShape.fontSize; // Basic estimation
+        }
+
+        const centerX = x + width / 2;
+        const centerY = y + height / 2;
+        const cos = Math.cos(shape.rotation);
+        const sin = Math.sin(shape.rotation);
+
+        return [
+          { x: x, y: y },
+          { x: x + width, y: y },
+          { x: x + width, y: y + height },
+          { x: x, y: y + height },
+        ].map((corner) => ({
+          x: centerX + (corner.x - centerX) * cos - (corner.y - centerY) * sin,
+          y: centerY + (corner.x - centerX) * sin + (corner.y - centerY) * cos,
+        }));
+      }
+      case "image": {
+        const imageShape = shape as ImageElement;
+        const { x, y, width, height, rotation } = imageShape;
+        const centerX = x + width / 2;
+        const centerY = y + height / 2;
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        return [
+          { x: x, y: y },
+          { x: x + width, y: y },
+          { x: x + width, y: y + height },
+          { x: x, y: y + height },
+        ].map((corner) => ({
+          x: centerX + (corner.x - centerX) * cos - (corner.y - centerY) * sin,
+          y: centerY + (corner.x - centerX) * sin + (corner.y - centerY) * cos,
+        }));
+      }
       default:
-        // For text, polygon, polyline, image - return empty corners
+        // For polygon, polyline - return empty corners for now (or implement bounding box)
         return [];
     }
   }
