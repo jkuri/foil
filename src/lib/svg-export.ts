@@ -1,4 +1,5 @@
 import type { CanvasElement, Shape } from "@/types";
+import { optimizeSVG } from "./svgo";
 
 // Helper to rotate a point around a center
 function rotatePoint(x: number, y: number, cx: number, cy: number, rotation: number): { x: number; y: number } {
@@ -257,7 +258,8 @@ ${svgElements}
  * Download SVG content as a file
  */
 export function downloadSVG(svgContent: string, filename = "export.svg"): void {
-  const blob = new Blob([svgContent], { type: "image/svg+xml" });
+  const optimized = optimizeSVG(svgContent);
+  const blob = new Blob([optimized], { type: "image/svg+xml" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

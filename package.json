@@ -40,6 +40,7 @@
     "react-window": "^2.2.4",
     "shadcn": "^3.6.3",
     "svg-pathdata": "^8.0.0",
+    "svgo": "^4.0.0",
     "svgson": "^5.3.1",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.18",
