@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
+import { canvasHistory } from "@/lib/canvas-history";
 import { getRandomShapeColorCSS } from "@/lib/colors";
 import { importSVGFromFile, translatePath } from "@/lib/svg-import";
 import { useCanvasStore } from "@/store";
@@ -292,7 +293,6 @@ export function CanvasToolbar() {
             const text = await file.text();
             const data = JSON.parse(text);
             if (data.elements && Array.isArray(data.elements)) {
-              const { canvasHistory } = await import("@/lib/canvas-history");
               canvasHistory.clear();
               useCanvasStore.setState({
                 elements: data.elements,
