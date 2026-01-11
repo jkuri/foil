@@ -702,10 +702,11 @@ export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => 
         }
       } else if (el.type === "text") {
         if (el.bounds) {
-          minX = Math.min(minX, el.bounds.x);
-          minY = Math.min(minY, el.bounds.y);
-          maxX = Math.max(maxX, el.bounds.x + el.bounds.width);
-          maxY = Math.max(maxY, el.bounds.y + el.bounds.height);
+          // Text bounds are relative to element position, so add el.x/el.y
+          minX = Math.min(minX, el.x + el.bounds.x);
+          minY = Math.min(minY, el.y + el.bounds.y);
+          maxX = Math.max(maxX, el.x + el.bounds.x + el.bounds.width);
+          maxY = Math.max(maxY, el.y + el.bounds.y + el.bounds.height);
         } else {
           // Fallback approximation
           minX = Math.min(minX, el.x);
