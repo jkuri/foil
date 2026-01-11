@@ -256,6 +256,9 @@ export function useCanvasInteractions({
         y2?: number;
         d?: string;
         bounds?: { x: number; y: number; width: number; height: number };
+        // For text elements: store original anchor position
+        anchorX?: number;
+        anchorY?: number;
       }
     >;
     handle: ResizeHandle;
@@ -369,6 +372,9 @@ export function useCanvasInteractions({
                   y2?: number;
                   d?: string;
                   bounds?: { x: number; y: number; width: number; height: number };
+                  // For text elements: store original anchor position (element.x, element.y)
+                  anchorX?: number;
+                  anchorY?: number;
                 }
               >();
 
@@ -389,6 +395,8 @@ export function useCanvasInteractions({
                   y2: undefined as number | undefined,
                   d: undefined as string | undefined,
                   bounds: undefined as { x: number; y: number; width: number; height: number } | undefined,
+                  anchorX: undefined as number | undefined,
+                  anchorY: undefined as number | undefined,
                 };
                 if (element.type === "ellipse") {
                   entry.cx = element.cx;
@@ -403,6 +411,11 @@ export function useCanvasInteractions({
                 } else if (element.type === "path") {
                   entry.d = element.d;
                   entry.bounds = element.bounds;
+                } else if (element.type === "text") {
+                  // Store original anchor position for text elements
+                  // eBounds.x/y is the absolute bounds position, but we need the anchor (element.x, element.y)
+                  entry.anchorX = element.x;
+                  entry.anchorY = element.y;
                 }
                 originalElements.set(element.id, entry);
               }
@@ -1153,7 +1166,7 @@ export function useCanvasInteractions({
               cy: center.y,
               rotation: newRotation,
             });
-          } else if (original.type === "rect" || original.type === "image" || original.type === "text") {
+          } else if (original.type === "rect" || original.type === "image") {
             // Calculate original center
             const ox = original.x + original.width / 2;
             const oy = original.y + original.height / 2;
@@ -1164,6 +1177,50 @@ export function useCanvasInteractions({
               y: center.y - original.height / 2,
               rotation: newRotation,
             });
+          } else if (original.type === "text") {
+            // Text rotates around its visual center (bounds center), same as text-overlay.tsx
+            // original.x/y is the bounds position (from getElementBounds)
+            // original.anchorX/anchorY stores the original element.x, element.y
+            const boundsX = original.x;
+            const boundsY = original.y;
+            const anchorX = original.anchorX ?? boundsX;
+            const anchorY = original.anchorY ?? boundsY;
+
+            // Visual center of the text bounds
+            const visualCenterX = boundsX + original.width / 2;
+            const visualCenterY = boundsY + original.height / 2;
+
+            // Single element rotation if only 1 element is being rotated
+            const isSingleElement = originalElements.size === 1;
+
+            if (isSingleElement) {
+              // Single element rotation - visual center is the pivot, position stays the same
+              updateElement(id, {
+                rotation: newRotation,
+              });
+            } else {
+              // Multi-element orbital rotation - rotate the visual center around the group center
+              const newVisualCenter = rotatePoint(visualCenterX, visualCenterY);
+
+              // Calculate new bounds position from new visual center
+              const newBoundsX = newVisualCenter.x - original.width / 2;
+              const newBoundsY = newVisualCenter.y - original.height / 2;
+
+              // Calculate original offset from anchor to bounds (in world space, at original rotation)
+              const anchorToBoundsX = boundsX - anchorX;
+              const anchorToBoundsY = boundsY - anchorY;
+
+              // Rotate this offset by deltaAngle
+              const rotatedOffsetX = anchorToBoundsX * cos - anchorToBoundsY * sin;
+              const rotatedOffsetY = anchorToBoundsX * sin + anchorToBoundsY * cos;
+
+              // New anchor = new bounds position minus rotated offset
+              updateElement(id, {
+                x: newBoundsX - rotatedOffsetX,
+                y: newBoundsY - rotatedOffsetY,
+                rotation: newRotation,
+              });
+            }
           } else if (original.type === "path") {
             // Path rotation requires standard bounds update plus path data rotation or just bounds?
             // Usually paths are defined by d-string relative to bounds or absolute?

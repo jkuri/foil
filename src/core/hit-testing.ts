@@ -95,30 +95,31 @@ export function getRotatedCorners(element: Shape): { x: number; y: number }[] {
     case "text": {
       let textWidth: number;
       let textHeight: number;
-      let x: number;
-      let y: number;
+      let boundsX: number;
+      let boundsY: number;
 
       if (element.bounds) {
         textWidth = element.bounds.width;
         textHeight = element.bounds.height;
-        x = element.x + element.bounds.x;
-        y = element.y + element.bounds.y;
+        boundsX = element.x + element.bounds.x;
+        boundsY = element.y + element.bounds.y;
       } else {
         textWidth = element.text.length * element.fontSize * 0.6;
         textHeight = element.fontSize * 1.2;
-        x = element.x;
-        y = element.y - element.fontSize;
+        boundsX = element.x;
+        boundsY = element.y - element.fontSize;
       }
 
-      const centerX = x + textWidth / 2;
-      const centerY = y + textHeight / 2;
+      // Rotate around visual center (same as text-overlay.tsx)
+      const centerX = boundsX + textWidth / 2;
+      const centerY = boundsY + textHeight / 2;
       const cos = Math.cos(element.rotation);
       const sin = Math.sin(element.rotation);
       return [
-        { x, y },
-        { x: x + textWidth, y },
-        { x: x + textWidth, y: y + textHeight },
-        { x, y: y + textHeight },
+        { x: boundsX, y: boundsY },
+        { x: boundsX + textWidth, y: boundsY },
+        { x: boundsX + textWidth, y: boundsY + textHeight },
+        { x: boundsX, y: boundsY + textHeight },
       ].map((corner) => {
         const dx = corner.x - centerX;
         const dy = corner.y - centerY;

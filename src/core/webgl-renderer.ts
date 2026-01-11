@@ -1198,8 +1198,8 @@ export class WebGLRenderer {
       case "text": {
         let width: number;
         let height: number;
-        let x: number;
-        let y: number;
+        let boundsX: number;
+        let boundsY: number;
 
         const textShape = shape as TextElement;
 
@@ -1207,27 +1207,27 @@ export class WebGLRenderer {
         if (textShape.bounds) {
           width = textShape.bounds.width;
           height = textShape.bounds.height;
-          // bounds in TextElement are relative to x,y?
-          // Based on webgl-canvas.tsx: x = element.x + element.bounds.x
-          x = textShape.x + textShape.bounds.x;
-          y = textShape.y + textShape.bounds.y;
+          // bounds are relative to x,y
+          boundsX = textShape.x + textShape.bounds.x;
+          boundsY = textShape.y + textShape.bounds.y;
         } else {
           width = textShape.text.length * textShape.fontSize * 0.6;
           height = textShape.fontSize * 1.2;
-          x = textShape.x;
-          y = textShape.y - textShape.fontSize; // Basic estimation
+          boundsX = textShape.x;
+          boundsY = textShape.y - textShape.fontSize; // Basic estimation
         }
 
-        const centerX = x + width / 2;
-        const centerY = y + height / 2;
+        // Rotate around visual center (same as text-overlay.tsx)
+        const centerX = boundsX + width / 2;
+        const centerY = boundsY + height / 2;
         const cos = Math.cos(shape.rotation);
         const sin = Math.sin(shape.rotation);
 
         return [
-          { x: x, y: y },
-          { x: x + width, y: y },
-          { x: x + width, y: y + height },
-          { x: x, y: y + height },
+          { x: boundsX, y: boundsY },
+          { x: boundsX + width, y: boundsY },
+          { x: boundsX + width, y: boundsY + height },
+          { x: boundsX, y: boundsY + height },
         ].map((corner) => ({
           x: centerX + (corner.x - centerX) * cos - (corner.y - centerY) * sin,
           y: centerY + (corner.x - centerX) * sin + (corner.y - centerY) * cos,

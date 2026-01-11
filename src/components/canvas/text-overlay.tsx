@@ -100,11 +100,25 @@ export function TextOverlay({ canvasRef, transform, fontsReady = false }: TextOv
 
         ctx.save();
 
-        // Apply rotation
+        // Calculate visual center for rotation (same as webgl-renderer and hit-testing)
+        let centerX: number;
+        let centerY: number;
+        if (textEl.bounds) {
+          centerX = x + textEl.bounds.x + textEl.bounds.width / 2;
+          centerY = y + textEl.bounds.y + textEl.bounds.height / 2;
+        } else {
+          // Fallback estimation
+          const estWidth = text.length * fontSize * 0.6;
+          const estHeight = fontSize * 1.2;
+          centerX = x + estWidth / 2;
+          centerY = y - fontSize + estHeight / 2;
+        }
+
+        // Apply rotation around visual center
         if (rotation) {
-          ctx.translate(x, y);
+          ctx.translate(centerX, centerY);
           ctx.rotate(rotation);
-          ctx.translate(-x, -y);
+          ctx.translate(-centerX, -centerY);
         }
 
         ctx.globalAlpha = opacity ?? 1;
