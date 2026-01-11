@@ -36,9 +36,15 @@ export function WebGLCanvas() {
     canvasBackground,
     canvasBackgroundVisible,
     importElements,
+    loadFromStorage,
   } = useCanvasStore();
 
   const { handlers, actions } = useCanvasControls();
+
+  // Load canvas state from IndexedDB on mount
+  useEffect(() => {
+    loadFromStorage();
+  }, []);
 
   // Use centralized hotkeys hook
   useHotkeys({

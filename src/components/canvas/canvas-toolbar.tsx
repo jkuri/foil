@@ -48,6 +48,7 @@ export function CanvasToolbar() {
   const importElements = useCanvasStore((s) => s.importElements);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const jsonInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportSVG = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -278,6 +279,39 @@ export function CanvasToolbar() {
     <>
       {/* Hidden file input for SVG import */}
       <input ref={fileInputRef} type="file" accept=".svg,image/svg+xml" className="hidden" onChange={handleImportSVG} />
+      {/* Hidden file input for JSON project import */}
+      <input
+        ref={jsonInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+            if (data.elements && Array.isArray(data.elements)) {
+              const { canvasHistory } = await import("@/lib/canvas-history");
+              canvasHistory.clear();
+              useCanvasStore.setState({
+                elements: data.elements,
+                selectedIds: [],
+                canvasBackground: data.canvasBackground || "#F5F5F5",
+                canvasBackgroundVisible: data.canvasBackgroundVisible ?? true,
+                transform: data.transform || { x: 0, y: 0, scale: 1 },
+              });
+              useCanvasStore.getState().pushHistory();
+            } else {
+              console.error("Invalid project file format");
+            }
+          } catch (error) {
+            console.error("Failed to open project:", error);
+          }
+          // Reset input so same file can be opened again
+          e.target.value = "";
+        }}
+      />
       <div className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border bg-background/80 p-1.5 shadow-2xl backdrop-blur-md">
         {/* Menu */}
         <DropdownMenu>
@@ -289,11 +323,11 @@ export function CanvasToolbar() {
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>File</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuItem disabled>New Project</DropdownMenuItem>
-                <DropdownMenuItem disabled>Open...</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => useCanvasStore.getState().newProject()}>New Project</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => jsonInputRef.current?.click()}>Open...</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>Import SVG...</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem disabled>Export</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => useCanvasStore.getState().exportProject()}>Export</DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { canvasHistory } from "@/lib/canvas-history";
 import type { CanvasElement, GroupElement, ResizeHandle, SmartGuide, Tool, Transform } from "@/types";
 
 interface CanvasState {
@@ -132,6 +133,17 @@ interface CanvasActions {
 
   // Drag and Drop
   moveElement: (elementId: string, targetId: string | null, position: "before" | "after" | "inside") => void;
+
+  // History / Persistence
+  pushHistory: () => void;
+  undo: () => void;
+  redo: () => void;
+  loadFromStorage: () => Promise<void>;
+
+  // File operations
+  newProject: () => void;
+  exportProject: () => void;
+  openProject: () => void;
 }
 
 // Helper to generate default element names
@@ -803,4 +815,113 @@ export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => 
 
       return { elements: newElements };
     }),
+
+  // History / Persistence actions
+  pushHistory: () => {
+    const state = get();
+    canvasHistory.push({
+      elements: state.elements,
+      canvasBackground: state.canvasBackground,
+      canvasBackgroundVisible: state.canvasBackgroundVisible,
+    });
+  },
+
+  undo: () => {
+    const snapshot = canvasHistory.undo();
+    if (snapshot) {
+      set({
+        elements: snapshot.elements,
+        canvasBackground: snapshot.canvasBackground,
+        canvasBackgroundVisible: snapshot.canvasBackgroundVisible,
+      });
+    }
+  },
+
+  redo: () => {
+    const snapshot = canvasHistory.redo();
+    if (snapshot) {
+      set({
+        elements: snapshot.elements,
+        canvasBackground: snapshot.canvasBackground,
+        canvasBackgroundVisible: snapshot.canvasBackgroundVisible,
+      });
+    }
+  },
+
+  loadFromStorage: async () => {
+    const snapshot = await canvasHistory.loadFromIndexedDB();
+    if (snapshot) {
+      set({
+        elements: snapshot.elements,
+        canvasBackground: snapshot.canvasBackground,
+        canvasBackgroundVisible: snapshot.canvasBackgroundVisible,
+      });
+    }
+  },
+
+  // File operations
+  newProject: () => {
+    canvasHistory.clear();
+    set({
+      elements: [],
+      selectedIds: [],
+      canvasBackground: "#F5F5F5",
+      canvasBackgroundVisible: true,
+      transform: { x: 0, y: 0, scale: 1 },
+    });
+  },
+
+  exportProject: () => {
+    const state = get();
+    const projectData = {
+      version: 1,
+      elements: state.elements,
+      canvasBackground: state.canvasBackground,
+      canvasBackgroundVisible: state.canvasBackgroundVisible,
+      transform: state.transform,
+      exportedAt: new Date().toISOString(),
+    };
+    const json = JSON.stringify(projectData, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `canvas-project-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  openProject: () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (data.elements && Array.isArray(data.elements)) {
+          canvasHistory.clear();
+          // Use setState directly to avoid closure issues with async
+          useCanvasStore.setState({
+            elements: data.elements,
+            selectedIds: [],
+            canvasBackground: data.canvasBackground || "#F5F5F5",
+            canvasBackgroundVisible: data.canvasBackgroundVisible ?? true,
+            transform: data.transform || { x: 0, y: 0, scale: 1 },
+          });
+          // Push initial state
+          useCanvasStore.getState().pushHistory();
+        } else {
+          console.error("Invalid project file format");
+        }
+      } catch (error) {
+        console.error("Failed to open project:", error);
+      }
+    };
+    input.click();
+  },
 }));

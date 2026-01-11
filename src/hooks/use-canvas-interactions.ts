@@ -1261,6 +1261,11 @@ export function useCanvasInteractions({
     setIsResizing(false);
     setIsRotating(false);
     setIsMarqueeSelecting(false);
+
+    if (dragStartRef.current || resizeStartRef.current || rotateStartRef.current) {
+      useCanvasStore.getState().pushHistory();
+    }
+
     dragStartRef.current = null;
     resizeStartRef.current = null;
     rotateStartRef.current = null;
