@@ -953,6 +953,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => 
         canvasBackground: snapshot.canvasBackground,
         canvasBackgroundVisible: snapshot.canvasBackgroundVisible,
       });
+      get().panToCenter();
     }
   },
 
