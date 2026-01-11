@@ -612,13 +612,13 @@ export function useCanvasInteractions({
                 // Pre-calculate candidates for snapping (everything NOT being dragged)
                 const snapCandidates = elements
                   .filter((e) => e.id !== deepHit.id && e.type !== "group")
-                  .map((e) => getBounds(e));
+                  .map((e) => getBounds(e, elements));
 
                 const snapPoints = elements
                   .filter((e) => e.id !== deepHit.id && e.type !== "group")
-                  .flatMap((e) => getSnapPoints(e));
+                  .flatMap((e) => getSnapPoints(e, elements));
 
-                const b = getBounds(deepHit);
+                const b = getBounds(deepHit, elements);
                 const originalBounds: Bounds = {
                   minX: b.minX,
                   minY: b.minY,
@@ -697,11 +697,11 @@ export function useCanvasInteractions({
               // Pre-calculate candidates for snapping (everything NOT being dragged)
               const snapCandidates = elements
                 .filter((e) => !excludedIds.has(e.id) && e.type !== "group")
-                .map((e) => getBounds(e));
+                .map((e) => getBounds(e, elements));
 
               const snapPoints = elements
                 .filter((e) => !excludedIds.has(e.id) && e.type !== "group")
-                .flatMap((e) => getSnapPoints(e));
+                .flatMap((e) => getSnapPoints(e, elements));
 
               const draggedEls = elements.filter((e) => elementsToDrag.includes(e.id));
               let minX = Infinity,
@@ -710,7 +710,7 @@ export function useCanvasInteractions({
                 maxY = -Infinity;
 
               for (const el of draggedEls) {
-                const b = getBounds(el);
+                const b = getBounds(el, elements);
                 minX = Math.min(minX, b.minX);
                 minY = Math.min(minY, b.minY);
                 maxX = Math.max(maxX, b.maxX);

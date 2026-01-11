@@ -36,8 +36,8 @@ const FIGMA_SNAP_THRESHOLD = 4;
 // BOUNDS UTILITIES
 // ============================================
 
-export function getBounds(element: CanvasElement): Bounds {
-  if (element.type === "rect") {
+export function getBounds(element: CanvasElement, allElements?: CanvasElement[]): Bounds {
+  if (element.type === "rect" || element.type === "image") {
     return {
       minX: element.x,
       minY: element.y,
@@ -81,12 +81,96 @@ export function getBounds(element: CanvasElement): Bounds {
       centerY: element.bounds.y + element.bounds.height / 2,
     };
   }
+  if (element.type === "text") {
+    if (element.bounds) {
+      // Text bounds are relative to element position
+      const minX = element.x + element.bounds.x;
+      const minY = element.y + element.bounds.y;
+      const maxX = minX + element.bounds.width;
+      const maxY = minY + element.bounds.height;
+      return {
+        minX,
+        minY,
+        maxX,
+        maxY,
+        centerX: (minX + maxX) / 2,
+        centerY: (minY + maxY) / 2,
+      };
+    }
+    // Fallback approximation
+    const minX = element.x;
+    const minY = element.y - element.fontSize;
+    const maxX = element.x + element.text.length * element.fontSize * 0.6;
+    const maxY = element.y;
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      centerX: (minX + maxX) / 2,
+      centerY: (minY + maxY) / 2,
+    };
+  }
+  if (element.type === "polygon" || element.type === "polyline") {
+    if (element.points.length === 0) {
+      return { minX: 0, minY: 0, maxX: 0, maxY: 0, centerX: 0, centerY: 0 };
+    }
+    let minX = element.points[0].x;
+    let minY = element.points[0].y;
+    let maxX = minX;
+    let maxY = minY;
+    for (const pt of element.points) {
+      minX = Math.min(minX, pt.x);
+      minY = Math.min(minY, pt.y);
+      maxX = Math.max(maxX, pt.x);
+      maxY = Math.max(maxY, pt.y);
+    }
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      centerX: (minX + maxX) / 2,
+      centerY: (minY + maxY) / 2,
+    };
+  }
+  if (element.type === "group" && allElements) {
+    // Calculate bounds from all children
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const childId of element.childIds) {
+      const child = allElements.find((e) => e.id === childId);
+      if (child) {
+        const childBounds = getBounds(child, allElements);
+        minX = Math.min(minX, childBounds.minX);
+        minY = Math.min(minY, childBounds.minY);
+        maxX = Math.max(maxX, childBounds.maxX);
+        maxY = Math.max(maxY, childBounds.maxY);
+      }
+    }
+
+    if (!Number.isFinite(minX)) {
+      return { minX: 0, minY: 0, maxX: 0, maxY: 0, centerX: 0, centerY: 0 };
+    }
+
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      centerX: (minX + maxX) / 2,
+      centerY: (minY + maxY) / 2,
+    };
+  }
   return { minX: 0, minY: 0, maxX: 0, maxY: 0, centerX: 0, centerY: 0 };
 }
 
-export function getSnapPoints(element: CanvasElement): Point[] {
+export function getSnapPoints(element: CanvasElement, allElements?: CanvasElement[]): Point[] {
   const points: Point[] = [];
-  if (element.type === "rect") {
+  if (element.type === "rect" || element.type === "image") {
     points.push({ x: element.x, y: element.y });
     points.push({ x: element.x + element.width, y: element.y });
     points.push({ x: element.x + element.width, y: element.y + element.height });
@@ -106,6 +190,34 @@ export function getSnapPoints(element: CanvasElement): Point[] {
     points.push({ x: element.cx + element.rx, y: element.cy });
     points.push({ x: element.cx, y: element.cy + element.ry });
     points.push({ x: element.cx - element.rx, y: element.cy });
+  } else if (element.type === "text") {
+    const b = getBounds(element);
+    points.push({ x: b.minX, y: b.minY });
+    points.push({ x: b.maxX, y: b.minY });
+    points.push({ x: b.maxX, y: b.maxY });
+    points.push({ x: b.minX, y: b.maxY });
+    points.push({ x: b.centerX, y: b.centerY });
+  } else if (element.type === "polygon" || element.type === "polyline") {
+    for (const pt of element.points) {
+      points.push({ x: pt.x, y: pt.y });
+    }
+  } else if (element.type === "group" && allElements) {
+    // Include snap points from all children
+    for (const childId of element.childIds) {
+      const child = allElements.find((e) => e.id === childId);
+      if (child) {
+        points.push(...getSnapPoints(child, allElements));
+      }
+    }
+    // Also add the group bounding box corners
+    const b = getBounds(element, allElements);
+    if (Number.isFinite(b.minX)) {
+      points.push({ x: b.minX, y: b.minY });
+      points.push({ x: b.maxX, y: b.minY });
+      points.push({ x: b.maxX, y: b.maxY });
+      points.push({ x: b.minX, y: b.maxY });
+      points.push({ x: b.centerX, y: b.centerY });
+    }
   }
   return points;
 }
