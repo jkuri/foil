@@ -2,6 +2,7 @@ import { NumberInput } from "@/components/shared/number-input";
 import { Separator } from "@/components/ui/separator";
 import { useCanvasStore } from "@/store";
 import type { EllipseElement } from "@/types";
+import { ExportSection } from "./export-section";
 import { FillSection } from "./fill-section";
 import { getElementBounds, RotateIcon, SectionHeader } from "./shared";
 import { StrokeSection } from "./stroke-section";
@@ -78,6 +79,10 @@ export function EllipseProperties({ element }: EllipsePropertiesProps) {
         <Separator />
 
         <StrokeSection element={element} />
+
+        <Separator />
+
+        <ExportSection element={element} />
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { getAvailableWeights, getFont, getFontAscender } from "@/lib/text-render
 import { calculateTextBounds } from "@/lib/text-to-path";
 import { useCanvasStore } from "@/store";
 import type { TextElement } from "@/types";
+import { ExportSection } from "./export-section";
 import { FillSection } from "./fill-section";
 import { SectionHeader } from "./shared";
 
@@ -238,6 +239,10 @@ export function TextProperties({ element }: TextPropertiesProps) {
         <Separator />
 
         <FillSection element={element} />
+
+        <Separator />
+
+        <ExportSection element={element} />
       </div>
     </div>
   );

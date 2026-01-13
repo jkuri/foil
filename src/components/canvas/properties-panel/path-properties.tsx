@@ -2,6 +2,7 @@ import { NumberInput } from "@/components/shared/number-input";
 import { Separator } from "@/components/ui/separator";
 import { useCanvasStore } from "@/store";
 import type { PathElement } from "@/types";
+import { ExportSection } from "./export-section";
 import { FillSection } from "./fill-section";
 import { SectionHeader } from "./shared";
 import { StrokeSection } from "./stroke-section";
@@ -40,6 +41,10 @@ export function PathProperties({ element }: PathPropertiesProps) {
         <Separator />
 
         <StrokeSection element={element} />
+
+        <Separator />
+
+        <ExportSection element={element} />
       </div>
     </div>
   );

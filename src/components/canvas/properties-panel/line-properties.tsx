@@ -2,6 +2,7 @@ import { NumberInput } from "@/components/shared/number-input";
 import { Separator } from "@/components/ui/separator";
 import { useCanvasStore } from "@/store";
 import type { LineElement } from "@/types";
+import { ExportSection } from "./export-section";
 import { getElementBounds, RotateIcon, SectionHeader } from "./shared";
 import { StrokeSection } from "./stroke-section";
 
@@ -83,6 +84,10 @@ export function LineProperties({ element }: LinePropertiesProps) {
         <Separator />
 
         <StrokeSection element={element} showMarkers />
+
+        <Separator />
+
+        <ExportSection element={element} />
       </div>
     </div>
   );

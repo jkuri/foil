@@ -2,6 +2,7 @@ import { NumberInput } from "@/components/shared/number-input";
 import { Separator } from "@/components/ui/separator";
 import { useCanvasStore } from "@/store";
 import type { ImageElement } from "@/types";
+import { ExportSection } from "./export-section";
 import { getElementBounds, RotateIcon, SectionHeader } from "./shared";
 
 interface ImagePropertiesProps {
@@ -60,6 +61,10 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
             />
           </div>
         </div>
+
+        <Separator />
+
+        <ExportSection element={element} />
       </div>
     </div>
   );

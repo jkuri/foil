@@ -117,7 +117,16 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
     if (selectedElements.length === 0) return;
 
     const svgContent = exportToSVG(selectedElements, elements);
-    downloadSVG(svgContent, "export.svg");
+
+    // Use element name for filename, or "export" as fallback
+    let filename = "export";
+    if (selectedElements.length === 1 && selectedElements[0].name) {
+      filename = selectedElements[0].name.replace(/\s+/g, "-").toLowerCase();
+    } else if (selectedElements.length > 1) {
+      filename = "selection";
+    }
+
+    downloadSVG(svgContent, `${filename}.svg`);
   };
 
   const isGroup = contextMenuTarget?.type === "group";
