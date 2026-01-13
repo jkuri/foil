@@ -1,4 +1,4 @@
-# WebGL Canvas
+# foil
 
 A high-performance, Figma-like canvas editor built with React, TypeScript, and WebGL.
 
@@ -99,36 +99,6 @@ npm run lint
 
 # Format
 npm run format
-```
-
-## Project Structure
-
-```txt
-src/
-├── components/         # React components
-│   ├── canvas/        # Canvas-specific components
-│   │   ├── webgl-canvas.tsx      # Main canvas component
-│   │   ├── layers-panel.tsx      # Layers sidebar
-│   │   ├── properties-panel.tsx  # Properties sidebar
-│   │   ├── canvas-toolbar.tsx    # Bottom toolbar
-│   │   ├── smart-guides.tsx      # Snap guides overlay
-│   │   └── ...
-│   └── ui/            # Shared UI components (shadcn)
-├── core/              # Core functionality
-│   ├── webgl-renderer.ts         # WebGL rendering engine
-│   ├── hit-testing.ts            # Element hit detection
-│   └── snapping.ts               # Smart snapping logic
-├── hooks/             # Custom React hooks
-│   ├── use-canvas-interactions.ts # Mouse/touch handling
-│   ├── use-canvas-controls.ts     # Zoom/pan controls
-│   └── use-hotkeys.ts             # Keyboard shortcuts
-├── store/             # Zustand store
-│   └── canvas-store.ts           # Global canvas state
-├── types/             # TypeScript types
-│   └── index.ts                  # Element type definitions
-└── lib/               # Utilities
-    ├── svg-import.ts             # SVG parsing
-    └── utils.ts                  # Helper functions
 ```
 
 ## License
