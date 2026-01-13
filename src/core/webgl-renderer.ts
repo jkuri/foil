@@ -500,6 +500,9 @@ export class WebGLRenderer {
     const centerX = x + width / 2;
     const centerY = y + height / 2;
 
+    // Reset offset
+    gl.uniform2f(gl.getUniformLocation(this.shapeProgram!, "u_offset"), 0, 0);
+
     // Draw fill
     if (fill) {
       const color = this.cssColorToRGBA(fill);
@@ -605,9 +608,6 @@ export class WebGLRenderer {
       if (rih > 0) {
         vRects.push(rix, riy, rix + riw, riy, rix, riy + rih, rix, riy + rih, rix + riw, riy, rix + riw, riy + rih);
       }
-
-      // Reset translation
-      gl.uniform2f(gl.getUniformLocation(this.shapeProgram!, "u_offset"), 0, 0);
 
       // Reset translation
       gl.uniform2f(gl.getUniformLocation(this.shapeProgram!, "u_offset"), 0, 0);
