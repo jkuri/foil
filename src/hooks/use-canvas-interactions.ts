@@ -846,7 +846,8 @@ export function useCanvasInteractions({
           lastClickElementRef.current = hit.id;
 
           const isAlreadySelected = selectedIds.includes(hit.id);
-          if (e.shiftKey) {
+          // Support multi-select with Shift or Cmd/Ctrl
+          if (e.shiftKey || e.metaKey || e.ctrlKey) {
             setSelectedIds(isAlreadySelected ? selectedIds.filter((id) => id !== hit.id) : [...selectedIds, hit.id]);
           } else {
             if (!isAlreadySelected) setSelectedIds([hit.id]);
