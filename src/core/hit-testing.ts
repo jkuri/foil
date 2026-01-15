@@ -726,16 +726,25 @@ export function getShapesInBox(
     if (element.visible === false) continue;
     if (element.type === "group") continue;
 
-    // Skip elements that are children of a selected group
-    if (element.parentId && selectedGroupIds.has(element.parentId)) continue;
+    // Find the top-level ancestor group (if any)
+    let topLevelAncestor: CanvasElement | null = null;
+    let currentParentId = element.parentId;
+    while (currentParentId) {
+      const parent = elementMap.get(currentParentId);
+      if (!parent) break;
+      topLevelAncestor = parent;
+      currentParentId = parent.parentId;
+    }
 
-    // If element has a parent group that wasn't selected, add the parent group
-    if (element.parentId) {
-      const parent = elementMap.get(element.parentId);
-      if (parent && !selectedGroupIds.has(parent.id)) {
+    // Skip if the top-level ancestor is already selected
+    if (topLevelAncestor && selectedGroupIds.has(topLevelAncestor.id)) continue;
+
+    // If element has a parent group that wasn't selected, add the top-level ancestor
+    if (topLevelAncestor) {
+      if (!selectedGroupIds.has(topLevelAncestor.id)) {
         if (elementIntersectsBox(element, minX, minY, maxX, maxY)) {
-          result.push(parent);
-          selectedGroupIds.add(parent.id);
+          result.push(topLevelAncestor);
+          selectedGroupIds.add(topLevelAncestor.id);
         }
       }
       continue;
