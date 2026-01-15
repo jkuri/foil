@@ -559,6 +559,67 @@ function lineIntersectsBox(
   return false;
 }
 
+// Helper to check if a single element intersects a selection box
+function elementIntersectsBox(element: CanvasElement, minX: number, minY: number, maxX: number, maxY: number): boolean {
+  if (element.visible === false) return false;
+  if (element.type === "group") return false;
+
+  // Special case for lines: check intersection with box
+  if (element.type === "line") {
+    const line = element as LineElement;
+    return lineIntersectsBox(line.x1, line.y1, line.x2, line.y2, minX, minY, maxX, maxY);
+  }
+
+  const shape = element as Shape;
+  const corners = getRotatedCorners(shape);
+
+  // Check if any corner is inside the selection box
+  for (const corner of corners) {
+    if (corner.x >= minX && corner.x <= maxX && corner.y >= minY && corner.y <= maxY) {
+      return true;
+    }
+  }
+
+  // Also check if the shape's bounding box overlaps
+  const shapeBounds = calculateBoundingBox([shape]);
+  if (!shapeBounds) return false;
+  return (
+    shapeBounds.x < maxX &&
+    shapeBounds.x + shapeBounds.width > minX &&
+    shapeBounds.y < maxY &&
+    shapeBounds.y + shapeBounds.height > minY
+  );
+}
+
+// Helper to check if any child of a group intersects the selection box
+function groupIntersectsBox(
+  group: CanvasElement,
+  elementMap: Map<string, CanvasElement>,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+): boolean {
+  if (group.type !== "group") return false;
+
+  for (const childId of group.childIds) {
+    const child = elementMap.get(childId);
+    if (!child) continue;
+
+    if (child.type === "group") {
+      // Recursively check nested groups
+      if (groupIntersectsBox(child, elementMap, minX, minY, maxX, maxY)) {
+        return true;
+      }
+    } else {
+      if (elementIntersectsBox(child, minX, minY, maxX, maxY)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function getShapesInBox(
   box: { startX: number; startY: number; endX: number; endY: number },
   elements: CanvasElement[],
@@ -572,34 +633,52 @@ export function getShapesInBox(
   const boxHeight = maxY - minY;
   if (boxWidth < 1 && boxHeight < 1) return [];
 
-  return elements.filter((element) => {
-    if (element.visible === false) return false;
-    if (element.type === "group") return false;
+  // Build element lookup map for O(1) access
+  const elementMap = new Map<string, CanvasElement>();
+  for (const el of elements) {
+    elementMap.set(el.id, el);
+  }
 
-    // Special case for lines: check intersection with box
-    if (element.type === "line") {
-      const line = element as LineElement;
-      return lineIntersectsBox(line.x1, line.y1, line.x2, line.y2, minX, minY, maxX, maxY);
-    }
+  const result: CanvasElement[] = [];
+  const selectedGroupIds = new Set<string>();
 
-    const shape = element as Shape;
-    const corners = getRotatedCorners(shape);
-
-    // Check if any corner is inside the selection box
-    for (const corner of corners) {
-      if (corner.x >= minX && corner.x <= maxX && corner.y >= minY && corner.y <= maxY) {
-        return true;
+  // First pass: find all groups that intersect the selection box
+  for (const element of elements) {
+    if (element.visible === false) continue;
+    if (element.type === "group" && !element.parentId) {
+      // Only check top-level groups
+      if (groupIntersectsBox(element, elementMap, minX, minY, maxX, maxY)) {
+        result.push(element);
+        selectedGroupIds.add(element.id);
       }
     }
+  }
 
-    // Also check if the shape's bounding box overlaps
-    const shapeBounds = calculateBoundingBox([shape]);
-    if (!shapeBounds) return false;
-    return (
-      shapeBounds.x < maxX &&
-      shapeBounds.x + shapeBounds.width > minX &&
-      shapeBounds.y < maxY &&
-      shapeBounds.y + shapeBounds.height > minY
-    );
-  });
+  // Second pass: find all top-level elements (not in a group) that intersect
+  for (const element of elements) {
+    if (element.visible === false) continue;
+    if (element.type === "group") continue;
+
+    // Skip elements that are children of a selected group
+    if (element.parentId && selectedGroupIds.has(element.parentId)) continue;
+
+    // If element has a parent group that wasn't selected, add the parent group
+    if (element.parentId) {
+      const parent = elementMap.get(element.parentId);
+      if (parent && !selectedGroupIds.has(parent.id)) {
+        if (elementIntersectsBox(element, minX, minY, maxX, maxY)) {
+          result.push(parent);
+          selectedGroupIds.add(parent.id);
+        }
+      }
+      continue;
+    }
+
+    // Top-level element (no parent)
+    if (elementIntersectsBox(element, minX, minY, maxX, maxY)) {
+      result.push(element);
+    }
+  }
+
+  return result;
 }
