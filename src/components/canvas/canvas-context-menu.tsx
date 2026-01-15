@@ -9,7 +9,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { getRandomShapeColorCSS, SHAPE_COLOR_NAMES, SHAPE_COLORS_CSS, type ShapeColorName } from "@/lib/colors";
+import { COLOR_PICKER_PRESETS, getRandomShapeColorCSS } from "@/lib/colors";
 import { downloadSVG, exportToSVG } from "@/lib/svg-export";
 import { convertTextToPath, type TextConversionResult } from "@/lib/text-to-path";
 import { useCanvasStore } from "@/store";
@@ -177,11 +177,14 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
               <>
                 <ContextMenuSub>
                   <ContextMenuSubTrigger>Change Color</ContextMenuSubTrigger>
-                  <ContextMenuSubContent>
-                    {SHAPE_COLOR_NAMES.map((name: ShapeColorName) => (
-                      <ContextMenuItem key={name} onClick={() => handleColorChange(SHAPE_COLORS_CSS[name])}>
-                        <span className="size-3 rounded-full" style={{ backgroundColor: SHAPE_COLORS_CSS[name] }} />
-                        {name}
+                  <ContextMenuSubContent className="grid w-50 grid-cols-8 gap-1 p-2">
+                    {COLOR_PICKER_PRESETS.map((color) => (
+                      <ContextMenuItem
+                        key={color}
+                        onClick={() => handleColorChange(color)}
+                        className="flex size-5 min-h-0 items-center justify-center rounded-sm border border-border/50 p-0"
+                      >
+                        <div className="size-full rounded-sm" style={{ backgroundColor: color }} />
                       </ContextMenuItem>
                     ))}
                   </ContextMenuSubContent>
