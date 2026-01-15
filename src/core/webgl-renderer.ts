@@ -448,7 +448,7 @@ export class WebGLRenderer {
 
     switch (element.type) {
       case "rect":
-        this.drawRect(element as RectElement);
+        this.drawRect(element as RectElement, scale);
         break;
       case "ellipse":
         this.drawEllipse(element as EllipseElement, scale);
@@ -485,14 +485,14 @@ export class WebGLRenderer {
     return cssToRGBA(color);
   }
 
-  private drawRect(element: RectElement): void {
+  private drawRect(element: RectElement, scale: number): void {
     const { x, y, width, height, fill, stroke, rotation, opacity } = element;
     const rx = element.rx || 0;
     const ry = element.ry || 0;
 
     // Use rounded rect logic if radius is significant
     if (rx > 0 || ry > 0) {
-      this.drawRoundedRect(element);
+      this.drawRoundedRect(element, scale);
       return;
     }
 
@@ -543,13 +543,16 @@ export class WebGLRenderer {
     }
   }
 
-  private drawRoundedRect(element: RectElement): void {
+  private drawRoundedRect(element: RectElement, scale: number): void {
     const { x, y, width, height, fill, stroke, rotation, opacity } = element;
     const gl = this.gl;
     // Clamping radius to half dimension
     const r = Math.min(element.rx || 0, width / 2, height / 2);
     const centerX = x + width / 2;
     const centerY = y + height / 2;
+
+    // Dynamic segment count based on zoom level and radius for smooth curves
+    const segments = Math.max(16, Math.min(256, Math.ceil(r * scale)));
 
     const color = fill ? this.cssColorToRGBA(fill) : [0, 0, 0, 0];
     color[3] *= (element.fillOpacity ?? 1) * opacity;
@@ -562,7 +565,6 @@ export class WebGLRenderer {
 
     // Function to generate corner fan vertices
     const getCornerVertices = (cx: number, cy: number, startAngle: number, endAngle: number) => {
-      const segments = 12; // smoothness
       const verts: number[] = [];
       verts.push(cx, cy); // center of fan
       for (let i = 0; i <= segments; i++) {
@@ -690,16 +692,45 @@ export class WebGLRenderer {
 
       // Now Arcs for corners.
       // We effectively need to draw a "thick line" arc.
-      // Approximated by small segments.
+      // Approximated by small segments with round caps at joints.
       const drawArcStroke = (cx: number, cy: number, start: number, end: number) => {
-        const segments = 12;
+        // Use same dynamic segment count as fill
+        const halfW = w / 2;
+
+        // Helper to draw a rotated disc (drawDisc resets rotation, so we pre-rotate position)
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        const drawRotatedDisc = (px: number, py: number, radius: number) => {
+          // Pre-rotate position around center
+          const dx = px - centerX;
+          const dy = py - centerY;
+          const rx = centerX + dx * cos - dy * sin;
+          const ry = centerY + dx * sin + dy * cos;
+          this.drawDisc(rx, ry, radius, gl);
+          // Restore rotation uniforms for subsequent line drawing
+          gl.uniform1f(gl.getUniformLocation(this.shapeProgram!, "u_rotation"), rotation);
+          gl.uniform2f(gl.getUniformLocation(this.shapeProgram!, "u_rotationCenter"), centerX, centerY);
+          gl.uniform4f(
+            gl.getUniformLocation(this.shapeProgram!, "u_color"),
+            sColor[0],
+            sColor[1],
+            sColor[2],
+            sColor[3],
+          );
+        };
+
         for (let i = 0; i < segments; i++) {
           const a1 = start + (i / segments) * (end - start);
           const a2 = start + ((i + 1) / segments) * (end - start);
           const p1 = { x: cx + Math.cos(a1) * r, y: cy + Math.sin(a1) * r };
           const p2 = { x: cx + Math.cos(a2) * r, y: cy + Math.sin(a2) * r };
           this.drawLineBetweenPoints(p1, p2, w, 1);
+          // Draw round caps at joints to fill gaps
+          drawRotatedDisc(p1.x, p1.y, halfW);
         }
+        // Draw cap at the end point too
+        const endP = { x: cx + Math.cos(end) * r, y: cy + Math.sin(end) * r };
+        drawRotatedDisc(endP.x, endP.y, halfW);
       };
 
       drawArcStroke(cNW.x, cNW.y, Math.PI, 1.5 * Math.PI);
