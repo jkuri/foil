@@ -321,6 +321,34 @@ export function hitTestShape(
   return null;
 }
 
+// Hit test all elements at a position, returns all hit elements in order (top to bottom)
+// Used for cycling through overlapping elements when double-clicking
+export function hitTestAllElements(
+  worldX: number,
+  worldY: number,
+  elements: CanvasElement[],
+  parentId?: string,
+): CanvasElement[] {
+  const hits: CanvasElement[] = [];
+
+  // Test in reverse order (top to bottom)
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const element = elements[i];
+    if (element.visible === false) continue;
+    if (element.locked) continue;
+    if (element.type === "group") continue; // Skip groups
+
+    // If parentId is specified, only include elements from that group
+    if (parentId !== undefined && element.parentId !== parentId) continue;
+
+    if (hitTestElement(worldX, worldY, element)) {
+      hits.push(element);
+    }
+  }
+
+  return hits;
+}
+
 export function hitTestResizeHandle(worldX: number, worldY: number, element: CanvasElement, scale = 1): ResizeHandle {
   if (element.type === "group") {
     // For groups, compute bounds from children and use axis-aligned hit test

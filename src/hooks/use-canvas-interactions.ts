@@ -6,6 +6,7 @@ import {
   getBounds,
   getShapesInBox,
   getSnapPoints,
+  hitTestAllElements,
   hitTestBoundsHandle,
   hitTestRotatedElementHandle,
   type Point,
@@ -653,6 +654,95 @@ export function useCanvasInteractions({
                 };
               }
               return;
+            }
+          }
+
+          // Double-click when already inside a group: cycle through overlapping elements
+          // This implements Figma-like behavior where double-clicking cycles to elements underneath
+          if (isDoubleClick && hasSelectedChild && selectedIds.length === 1) {
+            const currentSelected = getElementById(selectedIds[0]);
+            if (currentSelected?.parentId) {
+              // Get all elements at this position within the same group
+              const overlappingElements = hitTestAllElements(world.x, world.y, elements, currentSelected.parentId);
+
+              if (overlappingElements.length > 1) {
+                // Find current selection in the list
+                const currentIndex = overlappingElements.findIndex((e) => e.id === currentSelected.id);
+
+                // Cycle to the next element (wrap around)
+                const nextIndex = (currentIndex + 1) % overlappingElements.length;
+                const nextElement = overlappingElements[nextIndex];
+
+                lastClickTimeRef.current = 0;
+                lastClickElementRef.current = null;
+                setSelectedIds([nextElement.id]);
+
+                // Start dragging the newly selected element if not locked
+                if (!nextElement.locked) {
+                  setIsDragging(true);
+                  const elementsMap = new Map<
+                    string,
+                    {
+                      x: number;
+                      y: number;
+                      cx?: number;
+                      cy?: number;
+                      x1?: number;
+                      y1?: number;
+                      x2?: number;
+                      y2?: number;
+                    }
+                  >();
+
+                  if (nextElement.type === "rect" || nextElement.type === "image") {
+                    elementsMap.set(nextElement.id, { x: nextElement.x, y: nextElement.y });
+                  } else if (nextElement.type === "ellipse") {
+                    elementsMap.set(nextElement.id, { x: 0, y: 0, cx: nextElement.cx, cy: nextElement.cy });
+                  } else if (nextElement.type === "line") {
+                    elementsMap.set(nextElement.id, {
+                      x: 0,
+                      y: 0,
+                      x1: nextElement.x1,
+                      y1: nextElement.y1,
+                      x2: nextElement.x2,
+                      y2: nextElement.y2,
+                    });
+                  } else if (nextElement.type === "path") {
+                    elementsMap.set(nextElement.id, { x: nextElement.bounds.x, y: nextElement.bounds.y });
+                  } else if (nextElement.type === "text") {
+                    elementsMap.set(nextElement.id, { x: nextElement.x, y: nextElement.y });
+                  }
+
+                  // Pre-calculate candidates for snapping
+                  const snapCandidates = elements
+                    .filter((e) => e.id !== nextElement.id && e.type !== "group")
+                    .map((e) => getBounds(e, elements));
+
+                  const snapPoints = elements
+                    .filter((e) => e.id !== nextElement.id && e.type !== "group")
+                    .flatMap((e) => getSnapPoints(e, elements));
+
+                  const b = getBounds(nextElement, elements);
+                  const originalBounds: Bounds = {
+                    minX: b.minX,
+                    minY: b.minY,
+                    maxX: b.maxX,
+                    maxY: b.maxY,
+                    centerX: b.centerX,
+                    centerY: b.centerY,
+                  };
+
+                  dragStartRef.current = {
+                    worldX: world.x,
+                    worldY: world.y,
+                    elements: elementsMap,
+                    snapCandidates,
+                    snapPoints,
+                    originalBounds,
+                  };
+                }
+                return;
+              }
             }
           }
 
@@ -1349,11 +1439,19 @@ export function useCanvasInteractions({
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       const world = screenToWorld(e.clientX, e.clientY);
-      const hit = hitTest(world.x, world.y);
+
+      // Check if any currently selected element is a child (has parentId)
+      // If so, use deep select to allow right-clicking on children directly
+      const hasSelectedChild = selectedIds.some((id) => {
+        const el = getElementById(id);
+        return el?.parentId;
+      });
+
+      const hit = hitTest(world.x, world.y, hasSelectedChild);
       setContextMenuTarget(hit);
       if (hit && !selectedIds.includes(hit.id)) setSelectedIds([hit.id]);
     },
-    [screenToWorld, hitTest, selectedIds, setContextMenuTarget, setSelectedIds],
+    [screenToWorld, hitTest, selectedIds, setContextMenuTarget, setSelectedIds, getElementById],
   );
 
   // Get rotation cursor based on hovered handle and element rotation
