@@ -10,8 +10,7 @@ export function LoadingOverlay({ isLoading }: LoadingOverlayProps) {
 
   useEffect(() => {
     if (!isLoading) {
-      const timer = setTimeout(() => setVisible(false), 400);
-      return () => clearTimeout(timer);
+      setVisible(false);
     }
   }, [isLoading]);
 

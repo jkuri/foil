@@ -16,10 +16,10 @@ import { TextEditor } from "./text-editor";
 import { TextOverlay } from "./text-overlay";
 
 interface WebGLCanvasProps {
-  fontsReady?: boolean;
+  isReady?: boolean;
 }
 
-export function WebGLCanvas({ fontsReady = false }: WebGLCanvasProps) {
+export function WebGLCanvas({ isReady = false }: WebGLCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<WebGLRenderer | null>(null);
@@ -417,7 +417,7 @@ export function WebGLCanvas({ fontsReady = false }: WebGLCanvasProps) {
     <div ref={containerRef} className="relative h-screen w-full select-none overflow-hidden" style={{ cursor }}>
       <CanvasContextMenu onContextMenu={handleContextMenu}>
         <canvas ref={canvasRef} className="h-full w-full" />
-        <TextOverlay canvasRef={canvasRef.current} transform={transform} fontsReady={fontsReady} />
+        <TextOverlay canvasRef={canvasRef.current} transform={transform} fontsReady={isReady} />
       </CanvasContextMenu>
 
       {/* Hide all editing controls in view mode */}
