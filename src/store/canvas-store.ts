@@ -180,6 +180,55 @@ function generateElementName(type: CanvasElement["type"], elements: CanvasElemen
   return `${prefix} ${count}`;
 }
 
+// Helper to deep clone an element and offset it
+const cloneElement = (element: CanvasElement, newId: string, offset: number = 20): CanvasElement => {
+  const copy = { ...element, id: newId, name: `${element.name} Copy` };
+
+  if (copy.type === "rect" || copy.type === "image" || copy.type === "text") {
+    copy.x += offset;
+    copy.y += offset;
+  } else if (copy.type === "ellipse") {
+    copy.cx += offset;
+    copy.cy += offset;
+  } else if (copy.type === "line") {
+    copy.x1 += offset;
+    copy.y1 += offset;
+    copy.x2 += offset;
+    copy.y2 += offset;
+  } else if (copy.type === "path") {
+    copy.bounds = {
+      ...copy.bounds,
+      x: copy.bounds.x + offset,
+      y: copy.bounds.y + offset,
+    };
+  } else if (copy.type === "polygon" || copy.type === "polyline") {
+    copy.points = copy.points.map((p) => ({ x: p.x + offset, y: p.y + offset }));
+  }
+
+  return copy;
+};
+
+// Helper to recursively get all descendants of a group
+const getDescendants = (
+  groupId: string,
+  elements: CanvasElement[],
+  collected: CanvasElement[] = [],
+): CanvasElement[] => {
+  const group = elements.find((e) => e.id === groupId);
+  if (!group || group.type !== "group") return collected;
+
+  for (const childId of group.childIds) {
+    const child = elements.find((e) => e.id === childId);
+    if (child) {
+      collected.push(child);
+      if (child.type === "group") {
+        getDescendants(child.id, elements, collected);
+      }
+    }
+  }
+  return collected;
+};
+
 export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => ({
   // Initial state
   elements: [],
@@ -252,40 +301,107 @@ export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => 
 
   duplicateSelected: () => {
     const state = get();
-    const newIds: string[] = [];
+    if (state.selectedIds.length === 0) return [];
 
-    const newElements = [...state.elements];
+    const newElements: CanvasElement[] = [];
+    const newSelectedIds: string[] = [];
+    const idMap = new Map<string, string>(); // Old ID -> New ID
 
-    for (const id of state.selectedIds) {
-      const original = state.elements.find((e) => e.id === id);
-      if (original) {
-        const newId = crypto.randomUUID();
-        const copy = { ...original, id: newId, name: `${original.name} Copy` };
+    // 1. Identify top-level selected elements (elements whose parents are NOT also selected)
+    // This avoids double-cloning children of selected groups
+    const topLevelSelected = state.selectedIds.filter((id) => {
+      const element = state.elements.find((e) => e.id === id);
+      if (!element) return false;
+      // If element has a parent, and that parent is ALSO selected, skip this element (it will be cloned by the parent)
+      if (element.parentId && state.selectedIds.includes(element.parentId)) {
+        return false;
+      }
+      return true;
+    });
 
-        // Offset slightly
-        if (copy.type === "rect" || copy.type === "line" || copy.type === "path") {
-          if ("x" in copy) copy.x += 20;
-          if ("y" in copy) copy.y += 20;
-          if ("x1" in copy) {
-            copy.x1 += 20;
-            copy.x2 += 20;
-          }
-          if ("y1" in copy) {
-            copy.y1 += 20;
-            copy.y2 += 20;
-          }
-        } else if (copy.type === "ellipse") {
-          copy.cx += 20;
-          copy.cy += 20;
+    // 2. Gather all descendants for these top-level elements
+    const elementsToClone: CanvasElement[] = [];
+
+    for (const id of topLevelSelected) {
+      const element = state.elements.find((e) => e.id === id);
+      if (element) {
+        elementsToClone.push(element);
+        if (element.type === "group") {
+          const descendants = getDescendants(element.id, state.elements);
+          elementsToClone.push(...descendants);
         }
-
-        newElements.push(copy);
-        newIds.push(newId);
       }
     }
 
-    set({ elements: newElements, selectedIds: newIds });
-    return newIds;
+    // 3. Create new IDs and clone elements
+    for (const element of elementsToClone) {
+      const newId = crypto.randomUUID();
+      idMap.set(element.id, newId);
+    }
+
+    for (const element of elementsToClone) {
+      const newId = idMap.get(element.id)!;
+      // Apply offset ONLY to top-level items in this selection batch
+      // Descendants naturally follow their parents if parents are offset,
+      // BUT `cloneElement` applies offset to geometry.
+      // If we offset a group, we shouldn't double-offset children if they are absolute.
+      // However, our `cloneElement` applies offset to absolute coords.
+      // So effectively, we shift EVERYTHING in the batch by 20px.
+
+      const newElement = cloneElement(element, newId, 20);
+
+      // Re-link hierarchy
+      if (newElement.parentId && idMap.has(newElement.parentId)) {
+        newElement.parentId = idMap.get(newElement.parentId);
+      } else {
+        // If parent wasn't selected/cloned, drop the parent ref (orphan it? or keep original parent?)
+        // If we duplicate a selection, likely we want new copies to be siblings of originals (share parent)
+        // unless parent was also duplicated.
+        // Current logic: if parent NOT in map, keep original parentId (add to same group)
+        // OR make it top-level?
+        // Figma behavior: Duplicate inside group -> stays in group.
+        newElement.parentId = element.parentId;
+
+        // If we simply keep parentId, we must ensure the parent group gets updated with new child ID.
+        // But `updateElement` isn't called here. Use `set` logic later?
+        // Actually, we must push updates to the parent group element if it exists in state but not in clone set.
+      }
+
+      if (newElement.type === "group") {
+        newElement.childIds = newElement.childIds.map((cid) => idMap.get(cid)).filter(Boolean) as string[];
+      }
+
+      newElements.push(newElement);
+
+      // If this was one of the originally selected top-level items, select the new copy
+      if (topLevelSelected.includes(element.id)) {
+        newSelectedIds.push(newId);
+      }
+    }
+
+    // 4. Handle adding to existing parents (siblings of original selection)
+    const updatedState = [...state.elements, ...newElements];
+
+    // We need to update existing parents to include these new children
+    const elementsWithNonClonedParents = newElements.filter((e) => e.parentId && !idMap.has(e.parentId));
+
+    for (const newEl of elementsWithNonClonedParents) {
+      const parentIdx = updatedState.findIndex((e) => e.id === newEl.parentId);
+      if (parentIdx !== -1) {
+        const parent = updatedState[parentIdx] as GroupElement;
+        // Insert new child after the original child?
+        // Find index of original ID
+        // const originalId = ... (we'd need reverse lookup or iterate idMap)
+        // Simplest: append for now.
+        updatedState[parentIdx] = {
+          ...parent,
+          childIds: [...parent.childIds, newEl.id],
+        };
+      }
+    }
+
+    set({ elements: updatedState, selectedIds: newSelectedIds });
+    return newSelectedIds;
   },
 
   bringToFront: (id) =>
@@ -395,8 +511,31 @@ export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => 
   // Clipboard actions
   copySelected: () => {
     const state = get();
-    const selectedElements = state.elements.filter((e) => state.selectedIds.includes(e.id));
-    set({ clipboard: selectedElements });
+    // Similar logic to duplicate: gather all descendants
+    // 1. Identify top-level selected
+    const topLevelSelected = state.selectedIds.filter((id) => {
+      const element = state.elements.find((e) => e.id === id);
+      if (!element) return false;
+      if (element.parentId && state.selectedIds.includes(element.parentId)) {
+        return false;
+      }
+      return true;
+    });
+
+    // 2. Collect descendants
+    const elementsToCopy: CanvasElement[] = [];
+    for (const id of topLevelSelected) {
+      const element = state.elements.find((e) => e.id === id);
+      if (element) {
+        elementsToCopy.push(element);
+        if (element.type === "group") {
+          const descendants = getDescendants(element.id, state.elements);
+          elementsToCopy.push(...descendants);
+        }
+      }
+    }
+
+    set({ clipboard: elementsToCopy });
   },
 
   paste: () => {
@@ -404,58 +543,56 @@ export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => 
     if (state.clipboard.length === 0) return;
 
     const newElements: CanvasElement[] = [];
-    const newIds: string[] = [];
+    const newSelectedIds: string[] = [];
+    const idMap = new Map<string, string>(); // Old ID -> New ID
 
+    // 1. Generate new IDs map
     for (const element of state.clipboard) {
       const newId = crypto.randomUUID();
-      if (element.type === "rect") {
-        newElements.push({
-          ...element,
-          id: newId,
-          x: element.x + 20,
-          y: element.y + 20,
-          parentId: undefined,
-        });
-      } else if (element.type === "ellipse") {
-        newElements.push({
-          ...element,
-          id: newId,
-          cx: element.cx + 20,
-          cy: element.cy + 20,
-          parentId: undefined,
-        });
-      } else if (element.type === "line") {
-        newElements.push({
-          ...element,
-          id: newId,
-          x1: element.x1 + 20,
-          y1: element.y1 + 20,
-          x2: element.x2 + 20,
-          y2: element.y2 + 20,
-          parentId: undefined,
-        });
-      } else if (element.type === "path") {
-        newElements.push({
-          ...element,
-          id: newId,
-          bounds: {
-            ...element.bounds,
-            x: element.bounds.x + 20,
-            y: element.bounds.y + 20,
-          },
-          parentId: undefined,
-        });
+      idMap.set(element.id, newId);
+    }
+
+    // 2. Clone and fix references
+    // Identify top-level items in clipboard relative to the clipboard set
+    // (An item is top-level in clipboard if its parent is NOT in clipboard)
+    const topLevelInClipboard = state.clipboard.filter((e) => !e.parentId || !idMap.has(e.parentId));
+
+    for (const element of state.clipboard) {
+      const newId = idMap.get(element.id)!;
+
+      // Apply offset ONLY to top-level pasted items
+      // (Descendants follow 20px via parent, or via cloneElement logic)
+      // Actually cloneElement adds 20px to absolute geometry.
+      // If we clone everything with 20px offset, we shift the whole group 20px.
+      // This is correct for absolute coords.
+      const newElement = cloneElement(element, newId, 20);
+
+      // Fix parentId
+      if (newElement.parentId && idMap.has(newElement.parentId)) {
+        newElement.parentId = idMap.get(newElement.parentId);
+      } else {
+        // If parent logic above says it's top-level in clipboard, we unset parentId
+        // so it pastes to root (or we could paste into current selection if we wanted nesting)
+        // For now: paste to root
+        newElement.parentId = undefined;
       }
-      // Skip groups in paste for simplicity
-      if (element.type !== "group") {
-        newIds.push(newId);
+
+      // Fix childIds for groups
+      if (newElement.type === "group") {
+        newElement.childIds = newElement.childIds.map((cid) => idMap.get(cid)).filter(Boolean) as string[];
+      }
+
+      newElements.push(newElement);
+
+      // Select top-level pasted items
+      if (topLevelInClipboard.find((pl) => pl.id === element.id)) {
+        newSelectedIds.push(newId);
       }
     }
 
     set((s) => ({
       elements: [...s.elements, ...newElements],
-      selectedIds: newIds,
-      clipboard: newElements,
+      selectedIds: newSelectedIds,
     }));
   },
 
