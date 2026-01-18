@@ -48,6 +48,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
+import { downloadSVG, exportToSVG } from "@/lib/svg-export";
 import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement, GroupElement } from "@/types";
@@ -162,6 +163,12 @@ const LayerItem = memo(
     const handleContextRename = () => {
       setIsEditing(true);
       setEditName(element.name);
+    };
+
+    const handleContextExport = () => {
+      const allElements = useCanvasStore.getState().elements;
+      const svg = exportToSVG([element], allElements);
+      downloadSVG(svg, `${element.name}.svg`);
     };
 
     const handleContextDuplicate = () => {
@@ -391,6 +398,10 @@ const LayerItem = memo(
             {isVisible ? "Hide" : "Show"}
             <ContextMenuShortcut>⌘⇧H</ContextMenuShortcut>
           </ContextMenuItem>
+
+          <ContextMenuSeparator />
+
+          <ContextMenuItem onClick={handleContextExport}>Export as SVG</ContextMenuItem>
 
           <ContextMenuSeparator />
 
