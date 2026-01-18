@@ -1,4 +1,4 @@
-import { LockIcon, SquareUnlock02Icon } from "@hugeicons/core-free-icons";
+import { SquareLock01Icon, SquareUnlock02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { NumberInput } from "@/components/shared/number-input";
 import { Button } from "@/components/ui/button";
@@ -51,14 +51,14 @@ export function DimensionsSection({ element, updateElement }: DimensionsSectionP
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="size-6 rounded-md text-muted-foreground focus:bg-transparent focus:text-muted-foreground"
             onClick={toggleLock}
             title={isLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}
           >
             {isLocked ? (
-              <HugeiconsIcon icon={LockIcon} className="size-3.5" />
+              <HugeiconsIcon icon={SquareLock01Icon} className="size-4" />
             ) : (
-              <HugeiconsIcon icon={SquareUnlock02Icon} className="size-3.5" />
+              <HugeiconsIcon icon={SquareUnlock02Icon} className="size-4" />
             )}
           </Button>
         </div>
