@@ -1,4 +1,5 @@
-import { LockIcon, UnlockIcon } from "@/components/canvas/icons";
+import { LockIcon, SquareUnlock02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { NumberInput } from "@/components/shared/number-input";
 import { Button } from "@/components/ui/button";
 import type { CanvasElement } from "@/types";
@@ -53,7 +54,11 @@ export function DimensionsSection({ element, updateElement }: DimensionsSectionP
             onClick={toggleLock}
             title={isLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}
           >
-            {isLocked ? <LockIcon /> : <UnlockIcon />}
+            {isLocked ? (
+              <HugeiconsIcon icon={LockIcon} className="size-3.5" />
+            ) : (
+              <HugeiconsIcon icon={SquareUnlock02Icon} className="size-3.5" />
+            )}
           </Button>
         </div>
 

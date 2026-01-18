@@ -17,6 +17,24 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  ArrowDown01Icon,
+  ArrowRight01Icon,
+  CircleIcon,
+  Folder01Icon,
+  Image01Icon,
+  Layers01Icon,
+  LineIcon,
+  PolygonIcon,
+  Route01Icon,
+  SquareIcon,
+  SquareLock01Icon,
+  SquareUnlock02Icon,
+  TextIcon,
+  ViewIcon,
+  ViewOffSlashIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { List, type RowComponentProps } from "react-window";
@@ -32,23 +50,6 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement, GroupElement } from "@/types";
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  EllipseIcon,
-  EyeIcon,
-  EyeOffIcon,
-  FolderIcon,
-  ImageIcon,
-  LayersIcon,
-  LineIcon,
-  LockIcon,
-  PathIcon,
-  PolygonIcon,
-  RectIcon,
-  TextIcon,
-  UnlockIcon,
-} from "./icons";
 
 // ============================================
 // LAYER ITEM COMPONENT
@@ -68,24 +69,24 @@ interface LayerItemProps {
 function getTypeIcon(type: string) {
   switch (type) {
     case "rect":
-      return <RectIcon />;
+      return <HugeiconsIcon icon={SquareIcon} className="size-3.5" />;
     case "ellipse":
-      return <EllipseIcon />;
+      return <HugeiconsIcon icon={CircleIcon} className="size-3.5" />;
     case "line":
-      return <LineIcon />;
+      return <HugeiconsIcon icon={LineIcon} className="size-3.5" />;
     case "path":
-      return <PathIcon />;
+      return <HugeiconsIcon icon={Route01Icon} className="size-3.5" />;
     case "group":
-      return <FolderIcon />;
+      return <HugeiconsIcon icon={Folder01Icon} className="size-3.5" />;
     case "text":
-      return <TextIcon />;
+      return <HugeiconsIcon icon={TextIcon} className="size-3.5" />;
     case "image":
-      return <ImageIcon />;
+      return <HugeiconsIcon icon={Image01Icon} className="size-3.5" />;
     case "polygon":
     case "polyline":
-      return <PolygonIcon />;
+      return <HugeiconsIcon icon={PolygonIcon} className="size-3.5" />;
     default:
-      return <RectIcon />;
+      return <HugeiconsIcon icon={SquareIcon} className="size-3.5" />;
   }
 }
 
@@ -247,7 +248,11 @@ const LayerItem = memo(
               onClick={handleToggleExpand}
               onMouseDown={(e) => e.stopPropagation()} // Prevent drag start when clicking expand
             >
-              {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
+              {isExpanded ? (
+                <HugeiconsIcon icon={ArrowDown01Icon} className="size-3" />
+              ) : (
+                <HugeiconsIcon icon={ArrowRight01Icon} className="size-3" />
+              )}
             </button>
           )}
         </div>
@@ -287,7 +292,11 @@ const LayerItem = memo(
             onClick={handleToggleVisibility}
             title={isVisible ? "Hide" : "Show"}
           >
-            {isVisible ? <EyeIcon /> : <EyeOffIcon />}
+            {isVisible ? (
+              <HugeiconsIcon icon={ViewIcon} className="size-3.5" />
+            ) : (
+              <HugeiconsIcon icon={ViewOffSlashIcon} className="size-3.5" />
+            )}
           </button>
           <button
             type="button"
@@ -298,7 +307,11 @@ const LayerItem = memo(
             onClick={handleToggleLock}
             title={isLocked ? "Unlock" : "Lock"}
           >
-            {isLocked ? <LockIcon /> : <UnlockIcon />}
+            {isLocked ? (
+              <HugeiconsIcon icon={SquareLock01Icon} className="size-3.5" />
+            ) : (
+              <HugeiconsIcon icon={SquareUnlock02Icon} className="size-3.5" />
+            )}
           </button>
         </div>
       </div>
@@ -638,7 +651,7 @@ export function LayersPanel() {
       {/* Header */}
       <div className="flex h-10 items-center justify-between border-b bg-muted/30 px-3">
         <div className="flex items-center gap-2">
-          <LayersIcon />
+          <HugeiconsIcon icon={Layers01Icon} className="size-4" />
           <h3 className="font-medium text-sm">Layers</h3>
         </div>
         <span className="text-muted-foreground text-xs">{elements.length}</span>
