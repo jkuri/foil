@@ -382,6 +382,25 @@ export function useCanvasInteractions({
                 }
               >();
 
+              // Add the group itself to originalRotations if it's the single selected element
+              if (selectedElements.length === 1 && selectedElements[0].type === "group") {
+                const group = selectedElements[0];
+                originalRotations.set(group.id, group.rotation);
+                // We don't add the group to flattenedElements (which is used for calculating bounds),
+                // but we need to track it in originalElements to update its rotation later.
+                // However, the loop below iterates over `flattenedElements` which are CHILDREN.
+                // We need to add the group to `originalElements` separately.
+
+                originalElements.set(group.id, {
+                  x: 0,
+                  y: 0,
+                  width: 0,
+                  height: 0, // Group doesn't have intrinsic bounds usually, but we need the entry
+                  rotation: group.rotation,
+                  type: "group",
+                });
+              }
+
               for (const element of flattenedElements) {
                 originalRotations.set(element.id, element.rotation);
                 const eBounds = getElementBounds(element);
@@ -1591,6 +1610,11 @@ export function useCanvasInteractions({
               y1: p1.y,
               x2: p2.x,
               y2: p2.y,
+              rotation: newRotation,
+            });
+          } else if (original.type === "group") {
+            // Only update rotation for the group itself
+            updates.set(id, {
               rotation: newRotation,
             });
           } else if (original.type === "ellipse") {

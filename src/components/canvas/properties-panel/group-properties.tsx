@@ -245,7 +245,167 @@ export function GroupProperties({ element }: GroupPropertiesProps) {
             <NumberInput
               icon={<RotateIcon />}
               value={(element.rotation * 180) / Math.PI}
-              onChange={(v) => updateElement(element.id, { rotation: (v * Math.PI) / 180 })}
+              onChange={(v) => {
+                const newRotation = (v * Math.PI) / 180;
+                const deltaRotation = newRotation - element.rotation;
+
+                // Update group rotation
+                const updates = new Map<string, Record<string, unknown>>();
+                updates.set(element.id, { rotation: newRotation });
+
+                // Rotate children around group center
+                const groupCenterX = bounds.x + bounds.width / 2;
+                const groupCenterY = bounds.y + bounds.height / 2;
+
+                const cos = Math.cos(deltaRotation);
+                const sin = Math.sin(deltaRotation);
+
+                const traverse = (ids: string[]) => {
+                  for (const id of ids) {
+                    const el = elements.find((e) => e.id === id);
+                    if (!el) continue;
+
+                    if (el.type === "group") {
+                      // Update group rotation recursively?
+                      // Or just rotate its children?
+                      // If we rotate a group, its children need to move.
+                      // The group itself might need its rotation updated if we are tracking nested group rotation.
+                      // BUT `GroupElement.rotation` is usually 0 unless we are specifically using it as a transform.
+                      // Our renderer logic now USES `GroupElement.rotation` for the selection box.
+                      // So we should NOT recursively update `rotation` of nested groups unless we want nested local transforms.
+                      // For now, let's just move children positions.
+                      // Wait, if a nested group is rotated, its local rotation should be preserved (relative to parent).
+                      // We are applying a transform to the TOP level group.
+                      traverse(el.childIds);
+                    } else {
+                      // Rotate leaf element position around group center
+                      let _elX = 0;
+                      let _elY = 0;
+
+                      if (el.type === "rect" || el.type === "image" || el.type === "text") {
+                        // These have x,y
+                        // Note: TextElement has x,y but TS might be strict if union includes types without x,y
+                        // Casting or checking type explicitly
+                        _elX = el.x;
+                        _elY = el.y;
+                      } else if (el.type === "ellipse") {
+                        _elX = el.cx;
+                        _elY = el.cy;
+                      } else if (el.type === "line") {
+                        // Line has x1,y1, x2,y2. We can't reduce it to single x,y for generic rotation unless we handle it in the generic block?
+                        // The code BELOW handles Line specifically for updates.
+                        // But we calculate `dx/dy` here for `elUpdate`.
+                        // Wait, the generic block at line 289 sets `x, y` on `elUpdate`.
+                        // But line updates x1,y1 etc.
+                        // The issue is `const dx = el.x - groupCenterX;` assumes `el.x` exists.
+                        // It doesn't for Line/Ellipse/Path.
+                        // We should NOT calculate generic dx/dy logic here if we handle specific types below.
+                        // OR we define "center/position" for each type here.
+                        // Let's refactor: handle specific calculations INSIDE the if/else blocks and remove the generic top-level access.
+                      }
+
+                      const elUpdate: Record<string, unknown> = {}; // Initialize empty, populate inside blocks
+
+                      if (el.type === "line") {
+                        const dx1 = el.x1 - groupCenterX;
+                        const dy1 = el.y1 - groupCenterY;
+                        const dx2 = el.x2 - groupCenterX;
+                        const dy2 = el.y2 - groupCenterY;
+
+                        elUpdate.x1 = groupCenterX + dx1 * cos - dy1 * sin;
+                        elUpdate.y1 = groupCenterY + dx1 * sin + dy1 * cos;
+                        elUpdate.x2 = groupCenterX + dx2 * cos - dy2 * sin;
+                        elUpdate.y2 = groupCenterY + dx2 * sin + dy2 * cos;
+                        elUpdate.rotation = el.rotation + deltaRotation;
+                      } else if (el.type === "ellipse") {
+                        const dcx = el.cx - groupCenterX;
+                        const dcy = el.cy - groupCenterY;
+                        elUpdate.cx = groupCenterX + dcx * cos - dcy * sin;
+                        elUpdate.cy = groupCenterY + dcx * sin + dcy * cos;
+                        elUpdate.rotation = el.rotation + deltaRotation;
+                      } else if (el.type === "path") {
+                        // For paths, we need to rotate bounds... AND rotation?
+                        // PathElement has `bounds` AND `rotation`.
+                        // Update bounds center
+                        const b = el.bounds;
+                        const bCx = b.x + b.width / 2;
+                        const bCy = b.y + b.height / 2;
+
+                        const dbCx = bCx - groupCenterX;
+                        const dbCy = bCy - groupCenterY;
+
+                        const newBCx = groupCenterX + dbCx * cos - dbCy * sin;
+                        const newBCy = groupCenterY + dbCx * sin + dbCy * cos;
+
+                        const newBoundsX = newBCx - b.width / 2;
+                        const newBoundsY = newBCy - b.height / 2;
+
+                        elUpdate.bounds = { ...b, x: newBoundsX, y: newBoundsY };
+                        elUpdate.rotation = el.rotation + deltaRotation;
+                      } else if (el.type === "rect" || el.type === "image" || el.type === "text") {
+                        // Rect, Image, Text
+                        // Just update x/y (top-left) ... WAIT.
+                        // Rect x/y is top-left. Rotating around group center means:
+                        // Center of rect moves.
+                        // AND rotation changes.
+
+                        // Using getElementBounds is safer/generalized? No, specific types are better for updates.
+                        // All these types have x, y, width, height properties except text which computes width/height but has x,y.
+                        // TextElement: x, y, rotation. Width/height comes from measurement/bounds.
+                        // But x/y is anchor.
+
+                        let w = 0;
+                        let h = 0;
+
+                        if (el.type === "text") {
+                          // Text rotation is around x,y (anchor) usually?
+                          // getRotatedCorners for text uses bounds width/height.
+                          // Text rotation in renderer is around CENTER of bounds.
+
+                          // We need center of element.
+                          // TextElement bounds might be undefined in type definition but in practice present?
+                          // Types say `bounds?: ...`.
+                          if (el.bounds) {
+                            w = el.bounds.width;
+                            h = el.bounds.height;
+                          } else {
+                            // Fallback if no bounds
+                            w = 0;
+                            h = 0;
+                          }
+
+                          // Text x,y is usually bottom-left or top-left depending on implementation,
+                          // but our renderer treats it as top-left of the bounding box roughly (plus ascent).
+                          // Actually, let's assume we rotate the visual center.
+                          // If we don't know bounds, we can't rotate correctly around center.
+                          // But `el.x` and `el.y` are the position.
+                        } else {
+                          w = el.width;
+                          h = el.height;
+                        }
+
+                        const elCx = el.x + w / 2;
+                        const elCy = el.y + h / 2;
+
+                        const dCx = elCx - groupCenterX;
+                        const dCy = elCy - groupCenterY;
+
+                        const newCx = groupCenterX + dCx * cos - dCy * sin;
+                        const newCy = groupCenterY + dCx * sin + dCy * cos;
+
+                        elUpdate.x = newCx - w / 2;
+                        elUpdate.y = newCy - h / 2;
+                        elUpdate.rotation = el.rotation + deltaRotation;
+                      }
+
+                      updates.set(el.id, elUpdate);
+                    }
+                  }
+                };
+
+                traverse(element.childIds);
+                updateElements(updates);
+              }}
             />
           </div>
         </div>

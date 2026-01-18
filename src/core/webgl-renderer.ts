@@ -4,6 +4,7 @@ import type {
   BoundingBox,
   CanvasElement,
   EllipseElement,
+  GroupElement,
   ImageElement,
   LineElement,
   PathElement,
@@ -330,10 +331,18 @@ export class WebGLRenderer {
           // Single shape: draw rotated outline with handles
           this.drawShapeOutlineWithHandles(selectedShapes[0], scale);
         } else if (selectedShapes.length > 0) {
-          // Multiple shapes or group: draw individual outlines + bounding box
-          this.drawShapesOutlines(selectedShapes, scale);
-          const bounds = this.calculateBoundingBox(selectedShapes);
-          this.drawBoundingBoxWithHandles(bounds, true, scale);
+          // Check if we selected a single group to show rotation handles for it
+          if (selectedElements.length === 1 && selectedElements[0].type === "group") {
+            const group = selectedElements[0] as GroupElement;
+            const obb = this.calculateGroupOBB(selectedShapes, group.rotation);
+            this.drawShapesOutlines(selectedShapes, scale);
+            this.drawShapeOutlineWithHandles(obb, scale);
+          } else {
+            // Multiple shapes or group: draw individual outlines + bounding box
+            this.drawShapesOutlines(selectedShapes, scale);
+            const bounds = this.calculateBoundingBox(selectedShapes);
+            this.drawBoundingBoxWithHandles(bounds, true, scale);
+          }
         }
       }
 
@@ -1163,6 +1172,68 @@ export class WebGLRenderer {
     }
 
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  }
+
+  private calculateGroupOBB(shapes: Shape[], rotation: number): RectElement {
+    // 1. Rotate all corners by -rotation around (0,0) to align with axes
+    // 2. Find min/max bounds (Aligned Bounding Box)
+    // 3. Create RectElement with these dimensions, rotated by +rotation
+    // Note: We rotate around (0,0) because we don't know the group center yet.
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    const cos = Math.cos(-rotation);
+    const sin = Math.sin(-rotation);
+
+    for (const shape of shapes) {
+      const corners = this.getRotatedCorners(shape);
+      for (const corner of corners) {
+        // Rotate around (0,0)
+        const rx = corner.x * cos - corner.y * sin;
+        const ry = corner.x * sin + corner.y * cos;
+
+        minX = Math.min(minX, rx);
+        minY = Math.min(minY, ry);
+        maxX = Math.max(maxX, rx);
+        maxY = Math.max(maxY, ry);
+      }
+    }
+
+    const width = maxX - minX;
+    const height = maxY - minY;
+
+    // The center of the aligned box is (minX + w/2, minY + h/2)
+    const alignedCenterX = minX + width / 2;
+    const alignedCenterY = minY + height / 2;
+
+    // Rotate the center back to world space
+    const cosBack = Math.cos(rotation);
+    const sinBack = Math.sin(rotation);
+
+    const worldCenterX = alignedCenterX * cosBack - alignedCenterY * sinBack;
+    const worldCenterY = alignedCenterX * sinBack + alignedCenterY * cosBack;
+
+    // The RectElement takes x,y as top-left corner.
+    // But getRotatedCorners rotates around center (x+w/2, y+h/2).
+    // So if we set x/y such that centerX/Y matches worldCenterX/Y, we are good.
+    // x + w/2 = worldCenterX => x = worldCenterX - w/2
+
+    return {
+      type: "rect",
+      id: "group-obb",
+      name: "Group Bounds",
+      x: worldCenterX - width / 2,
+      y: worldCenterY - height / 2,
+      width,
+      height,
+      rotation,
+      fill: null,
+      stroke: { color: "#0099ff", width: 1 },
+      opacity: 1,
+    };
   }
 
   private resetRotation(): void {
