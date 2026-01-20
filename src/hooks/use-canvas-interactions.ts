@@ -1,21 +1,65 @@
 import { useCallback, useMemo, useRef } from "react";
 import {
-  type Bounds,
   calculateBoundingBox,
-  calculateSnapAdjustment,
-  getBounds,
   getShapesInBox,
-  getSnapPoints,
   hitTestAllElements,
   hitTestAllTopLevel,
   hitTestBoundsHandle,
   hitTestRotatedElementHandle,
-  type Point,
 } from "@/core";
+import { type Bounds, calculateSnaps, createSnapState, getBounds, type SnapState } from "@/core/snapping";
 import { resizePath } from "@/lib/svg-import";
+
 import { useCanvasStore } from "@/store";
-import type { BoundingBox, CanvasElement, ResizeHandle, Shape } from "@/types";
+import type { BoundingBox, CanvasElement, ResizeHandle, Shape, SmartGuide } from "@/types";
 import { getElementBounds } from "@/types";
+
+// Performance: RAF-based update batching for drag/resize operations
+interface PendingUpdate {
+  type: "drag" | "resize" | "rotate" | "marquee";
+  updates?: Map<string, Record<string, unknown>>;
+  singleUpdate?: { id: string; data: Record<string, unknown> };
+  selectionBox?: { startX: number; startY: number; endX: number; endY: number } | null;
+  selectedIds?: string[];
+  smartGuides?: SmartGuide[];
+}
+
+let pendingUpdate: PendingUpdate | null = null;
+let rafScheduled = false;
+
+function flushPendingUpdate() {
+  if (!pendingUpdate) return;
+
+  const update = pendingUpdate;
+  pendingUpdate = null;
+  rafScheduled = false;
+
+  const { updateElements, updateElement, setSelectionBox, setSelectedIds, setSmartGuides } = useCanvasStore.getState();
+
+  if (update.updates && update.updates.size > 0) {
+    updateElements(update.updates);
+  }
+  if (update.singleUpdate) {
+    updateElement(update.singleUpdate.id, update.singleUpdate.data);
+  }
+  if (update.selectionBox !== undefined) {
+    setSelectionBox(update.selectionBox);
+  }
+  if (update.selectedIds !== undefined) {
+    setSelectedIds(update.selectedIds);
+  }
+  if (update.smartGuides !== undefined) {
+    setSmartGuides(update.smartGuides);
+  }
+}
+
+function scheduleUpdate(update: PendingUpdate) {
+  pendingUpdate = update;
+  if (!rafScheduled) {
+    rafScheduled = true;
+    requestAnimationFrame(flushPendingUpdate);
+  }
+}
 
 // Helper to flatten groups recursively
 function flattenCanvasElements(
@@ -54,6 +98,11 @@ function getDescendantIds(ids: string[], getElementById: (id: string) => CanvasE
 
   collectDescendants(ids);
   return descendants;
+}
+
+function getSnapCandidatesAndPoints(elements: CanvasElement[], excludeIds: Set<string> | string): SnapState {
+  const excludeSet = typeof excludeIds === "string" ? new Set([excludeIds]) : excludeIds;
+  return createSnapState(elements, excludeSet);
 }
 
 // Generate Figma-style SVG cursor for resize handles with rotation
@@ -189,8 +238,6 @@ export function useCanvasInteractions({
     setContextMenuTarget,
     setSelectionBox,
     getElementById,
-    updateElement,
-    updateElements,
   } = useCanvasStore();
 
   const dragStartRef = useRef<{
@@ -200,8 +247,7 @@ export function useCanvasInteractions({
       string,
       { x: number; y: number; cx?: number; cy?: number; x1?: number; y1?: number; x2?: number; y2?: number }
     >;
-    snapCandidates: Bounds[];
-    snapPoints: Point[];
+    snapState: SnapState;
     originalBounds: Bounds;
   } | null>(null);
 
@@ -273,6 +319,10 @@ export function useCanvasInteractions({
   const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastClickTimeRef = useRef<number>(0);
   const lastClickElementRef = useRef<string | null>(null);
+
+  // Performance: Throttle hover handle detection to reduce hit testing during idle
+  const lastHoverCheckRef = useRef<number>(0);
+  const HOVER_THROTTLE_MS = 16; // ~60fps
 
   // Get the rotation of the currently selected element(s) for cursor
   const selectedRotation = useMemo(() => {
@@ -695,13 +745,8 @@ export function useCanvasInteractions({
                     // Get all descendant IDs for snap exclusion
                     const excludedIds = getDescendantIds(selectedIds, getElementById);
 
-                    const snapCandidates = elements
-                      .filter((e) => !excludedIds.has(e.id) && e.type !== "group")
-                      .map((e) => getBounds(e, elements));
-
-                    const snapPoints = elements
-                      .filter((e) => !excludedIds.has(e.id) && e.type !== "group")
-                      .flatMap((e) => getSnapPoints(e, elements));
+                    // Performance: Limit snap candidates for large canvases
+                    const snapState = getSnapCandidatesAndPoints(elements, excludedIds);
 
                     const originalBounds: Bounds = {
                       minX: bounds.x,
@@ -716,8 +761,7 @@ export function useCanvasInteractions({
                       worldX: world.x,
                       worldY: world.y,
                       elements: elementsMap,
-                      snapCandidates,
-                      snapPoints,
+                      snapState,
                       originalBounds,
                     };
                     return;
@@ -786,13 +830,7 @@ export function useCanvasInteractions({
                   elementsMap.set(deepHit.id, { x: deepHit.x, y: deepHit.y });
                 }
 
-                const snapCandidates = elements
-                  .filter((e) => e.id !== deepHit.id && e.type !== "group")
-                  .map((e) => getBounds(e, elements));
-
-                const snapPoints = elements
-                  .filter((e) => e.id !== deepHit.id && e.type !== "group")
-                  .flatMap((e) => getSnapPoints(e, elements));
+                const snapState = getSnapCandidatesAndPoints(elements, deepHit.id);
 
                 const b = getBounds(deepHit, elements);
                 const originalBounds: Bounds = {
@@ -808,8 +846,7 @@ export function useCanvasInteractions({
                   worldX: world.x,
                   worldY: world.y,
                   elements: elementsMap,
-                  snapCandidates,
-                  snapPoints,
+                  snapState,
                   originalBounds,
                 };
               }
@@ -853,13 +890,7 @@ export function useCanvasInteractions({
                 }
 
                 // Pre-calculate candidates for snapping (everything NOT being dragged)
-                const snapCandidates = elements
-                  .filter((e) => e.id !== deepHit.id && e.type !== "group")
-                  .map((e) => getBounds(e, elements));
-
-                const snapPoints = elements
-                  .filter((e) => e.id !== deepHit.id && e.type !== "group")
-                  .flatMap((e) => getSnapPoints(e, elements));
+                const snapState = getSnapCandidatesAndPoints(elements, deepHit.id);
 
                 const b = getBounds(deepHit, elements);
                 const originalBounds: Bounds = {
@@ -875,8 +906,7 @@ export function useCanvasInteractions({
                   worldX: world.x,
                   worldY: world.y,
                   elements: elementsMap,
-                  snapCandidates,
-                  snapPoints,
+                  snapState,
                   originalBounds,
                 };
               }
@@ -961,13 +991,7 @@ export function useCanvasInteractions({
                   }
 
                   // Pre-calculate candidates for snapping
-                  const snapCandidates = elements
-                    .filter((e) => e.id !== nextElement.id && e.type !== "group")
-                    .map((e) => getBounds(e, elements));
-
-                  const snapPoints = elements
-                    .filter((e) => e.id !== nextElement.id && e.type !== "group")
-                    .flatMap((e) => getSnapPoints(e, elements));
+                  const snapState = getSnapCandidatesAndPoints(elements, nextElement.id);
 
                   const b = getBounds(nextElement, elements);
                   const originalBounds: Bounds = {
@@ -983,8 +1007,7 @@ export function useCanvasInteractions({
                     worldX: world.x,
                     worldY: world.y,
                     elements: elementsMap,
-                    snapCandidates,
-                    snapPoints,
+                    snapState,
                     originalBounds,
                   };
                 }
@@ -1048,13 +1071,7 @@ export function useCanvasInteractions({
               const excludedIds = getDescendantIds(elementsToDrag, getElementById);
 
               // Pre-calculate candidates for snapping (everything NOT being dragged)
-              const snapCandidates = elements
-                .filter((e) => !excludedIds.has(e.id) && e.type !== "group")
-                .map((e) => getBounds(e, elements));
-
-              const snapPoints = elements
-                .filter((e) => !excludedIds.has(e.id) && e.type !== "group")
-                .flatMap((e) => getSnapPoints(e, elements));
+              const snapState = getSnapCandidatesAndPoints(elements, excludedIds);
 
               const draggedEls = elements.filter((e) => elementsToDrag.includes(e.id));
               let minX = Infinity,
@@ -1083,8 +1100,7 @@ export function useCanvasInteractions({
                 worldX: world.x,
                 worldY: world.y,
                 elements: elementsMap,
-                snapCandidates,
-                snapPoints,
+                snapState,
                 originalBounds,
               };
             }
@@ -1128,31 +1144,36 @@ export function useCanvasInteractions({
     (e: MouseEvent) => {
       const world = screenToWorld(e.clientX, e.clientY);
 
-      // Update hovered handle
+      // Update hovered handle (throttled for performance)
       if (activeTool === "select" && !isPanning && !isDragging && !isResizing && !isMarqueeSelecting) {
-        if (selectedIds.length > 0) {
-          const selectedElements = selectedIds.map((id) => getElementById(id)).filter(Boolean) as CanvasElement[];
+        const now = performance.now();
+        if (now - lastHoverCheckRef.current >= HOVER_THROTTLE_MS) {
+          lastHoverCheckRef.current = now;
 
-          let handle: ResizeHandle = null;
-          if (
-            selectedElements.length === 1 &&
-            selectedElements[0].type !== "group" &&
-            selectedElements[0].type !== "text"
-          ) {
-            handle = hitTestRotatedElementHandle(world.x, world.y, selectedElements[0] as Shape, transform.scale);
-          } else if (
-            selectedElements.length > 1 ||
-            (selectedElements.length === 1 && selectedElements[0].type === "group")
-          ) {
-            const flattened = flattenCanvasElements(selectedElements, getElementById);
-            const bounds = calculateBoundingBox(flattened);
-            if (bounds) {
-              handle = hitTestBoundsHandle(world.x, world.y, bounds, transform.scale);
+          if (selectedIds.length > 0) {
+            const selectedElements = selectedIds.map((id) => getElementById(id)).filter(Boolean) as CanvasElement[];
+
+            let handle: ResizeHandle = null;
+            if (
+              selectedElements.length === 1 &&
+              selectedElements[0].type !== "group" &&
+              selectedElements[0].type !== "text"
+            ) {
+              handle = hitTestRotatedElementHandle(world.x, world.y, selectedElements[0] as Shape, transform.scale);
+            } else if (
+              selectedElements.length > 1 ||
+              (selectedElements.length === 1 && selectedElements[0].type === "group")
+            ) {
+              const flattened = flattenCanvasElements(selectedElements, getElementById);
+              const bounds = calculateBoundingBox(flattened);
+              if (bounds) {
+                handle = hitTestBoundsHandle(world.x, world.y, bounds, transform.scale);
+              }
             }
+            setHoveredHandle(handle);
+          } else {
+            setHoveredHandle(null);
           }
-          setHoveredHandle(handle);
-        } else {
-          setHoveredHandle(null);
         }
       }
 
@@ -1175,8 +1196,7 @@ export function useCanvasInteractions({
           useCanvasStore.getState().snapToGeometry
         ) {
           const originalBounds = dragStartRef.current.originalBounds;
-          const snapCandidates = dragStartRef.current.snapCandidates;
-          const snapPoints = dragStartRef.current.snapPoints;
+          const snapState = dragStartRef.current.snapState;
 
           // Projected bounds
           const projected: Bounds = {
@@ -1190,17 +1210,14 @@ export function useCanvasInteractions({
 
           const { snapToGrid, snapToObjects, snapToGeometry, gridSize } = useCanvasStore.getState();
 
-          const snapResult = calculateSnapAdjustment(
-            projected,
-            snapCandidates,
-            snapPoints,
+          const snapResult = calculateSnaps(projected, snapState, {
             snapToGrid,
             snapToObjects,
             snapToGeometry,
-            transform.scale,
-            10, // threshold
             gridSize,
-          );
+            threshold: 10,
+            scale: transform.scale,
+          });
 
           finalDeltaX = deltaX + snapResult.x;
           finalDeltaY = deltaY + snapResult.y;
@@ -1238,7 +1255,12 @@ export function useCanvasInteractions({
           }
         }
         if (updates.size > 0) {
-          updateElements(updates);
+          // Performance: Use RAF-based batching for drag updates
+          scheduleUpdate({
+            type: "drag",
+            updates,
+            smartGuides: useCanvasStore.getState().smartGuides,
+          });
         }
       }
 
@@ -1349,11 +1371,18 @@ export function useCanvasInteractions({
             const finalX = newCenterWorldX - newWidth / 2;
             const finalY = newCenterWorldY - newHeight / 2;
 
-            updateElement(id, {
-              x: finalX,
-              y: finalY,
-              width: newWidth,
-              height: newHeight,
+            // Performance: Use RAF-based batching for resize updates
+            scheduleUpdate({
+              type: "resize",
+              singleUpdate: {
+                id,
+                data: {
+                  x: finalX,
+                  y: finalY,
+                  width: newWidth,
+                  height: newHeight,
+                },
+              },
             });
           } else if (original.type === "line") {
             const currentX1 = original.x1 ?? 0;
@@ -1363,15 +1392,27 @@ export function useCanvasInteractions({
 
             if (handle === "nw") {
               // Start point
-              updateElement(id, {
-                x1: currentX1 + deltaX,
-                y1: currentY1 + deltaY,
+              scheduleUpdate({
+                type: "resize",
+                singleUpdate: {
+                  id,
+                  data: {
+                    x1: currentX1 + deltaX,
+                    y1: currentY1 + deltaY,
+                  },
+                },
               });
             } else if (handle === "se") {
               // End point
-              updateElement(id, {
-                x2: currentX2 + deltaX,
-                y2: currentY2 + deltaY,
+              scheduleUpdate({
+                type: "resize",
+                singleUpdate: {
+                  id,
+                  data: {
+                    x2: currentX2 + deltaX,
+                    y2: currentY2 + deltaY,
+                  },
+                },
               });
             }
           } else if (original.type === "path") {
@@ -1447,9 +1488,16 @@ export function useCanvasInteractions({
             const newBounds = { x: newX, y: newY, width: newWidth, height: newHeight };
             const newD = resizePath(original.d!, bounds, newBounds);
 
-            updateElement(id, {
-              d: newD,
-              bounds: newBounds,
+            // Performance: Use RAF-based batching for resize updates
+            scheduleUpdate({
+              type: "resize",
+              singleUpdate: {
+                id,
+                data: {
+                  d: newD,
+                  bounds: newBounds,
+                },
+              },
             });
           }
         } else {
@@ -1578,7 +1626,14 @@ export function useCanvasInteractions({
             }
           }
           if (updates.size > 0) {
-            updateElements(updates);
+            // Performance: Use RAF-based batching for drag updates
+            const { snapToGrid, snapToObjects, snapToGeometry } = useCanvasStore.getState();
+            const hasSnapping = snapToGrid || snapToObjects || snapToGeometry;
+            scheduleUpdate({
+              type: "drag",
+              updates,
+              smartGuides: hasSnapping ? useCanvasStore.getState().smartGuides : [],
+            });
           }
         }
       }
@@ -1699,18 +1754,16 @@ export function useCanvasInteractions({
           }
         }
         if (updates.size > 0) {
-          updateElements(updates);
+          // Performance: Use RAF-based batching for rotation updates
+          scheduleUpdate({
+            type: "rotate",
+            updates,
+          });
         }
       }
 
       if (isMarqueeSelecting && marqueeStartRef.current) {
         lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-        setSelectionBox({
-          startX: marqueeStartRef.current.worldX,
-          startY: marqueeStartRef.current.worldY,
-          endX: world.x,
-          endY: world.y,
-        });
 
         const elements = useCanvasStore.getState().elements;
         const boxElements = getShapesInBox(
@@ -1723,15 +1776,28 @@ export function useCanvasInteractions({
           elements,
         );
 
+        let newSelectedIds: string[] | undefined;
         if (boxElements.length > 0 || initialSelectedIdsRef.current.length > 0) {
           const newIds = [...new Set([...initialSelectedIdsRef.current, ...boxElements.map((e) => e.id)])];
 
           if (newIds.length !== selectedIds.length || !newIds.every((id) => selectedIds.includes(id))) {
-            setSelectedIds(newIds);
+            newSelectedIds = newIds;
           }
         } else if (selectedIds.length > 0) {
-          setSelectedIds([]);
+          newSelectedIds = [];
         }
+
+        // Performance: Use RAF-based batching for marquee selection
+        scheduleUpdate({
+          type: "marquee",
+          selectionBox: {
+            startX: marqueeStartRef.current.worldX,
+            startY: marqueeStartRef.current.worldY,
+            endX: world.x,
+            endY: world.y,
+          },
+          selectedIds: newSelectedIds,
+        });
       }
     },
     [
@@ -1748,10 +1814,6 @@ export function useCanvasInteractions({
       getElementById,
       transform.scale,
       setHoveredHandle,
-      setHoveredHandle,
-      updateElement,
-      updateElements,
-      setSelectionBox,
     ],
   );
 

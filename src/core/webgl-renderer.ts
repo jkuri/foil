@@ -135,6 +135,10 @@ export class WebGLRenderer {
   private getState: GetStateFunc | null = null;
 
   private pathCache = new Map<string, PathCacheEntry>();
+
+  // Performance: Reusable buffer pool to avoid allocations during rendering
+  private vertexPool12 = new Float32Array(24); // 12 vertices (rectangles, lines)
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const gl = canvas.getContext("webgl", { antialias: true, alpha: true });
@@ -515,22 +519,22 @@ export class WebGLRenderer {
     if (fill) {
       const color = this.cssColorToRGBA(fill);
       color[3] *= (element.fillOpacity ?? 1) * opacity;
-      const vertices = new Float32Array([
-        x,
-        y,
-        x + width,
-        y,
-        x,
-        y + height,
-        x,
-        y + height,
-        x + width,
-        y,
-        x + width,
-        y + height,
-      ]);
+      // Performance: Use pooled buffer to avoid allocations
+      const vertices = this.vertexPool12;
+      vertices[0] = x;
+      vertices[1] = y;
+      vertices[2] = x + width;
+      vertices[3] = y;
+      vertices[4] = x;
+      vertices[5] = y + height;
+      vertices[6] = x;
+      vertices[7] = y + height;
+      vertices[8] = x + width;
+      vertices[9] = y;
+      vertices[10] = x + width;
+      vertices[11] = y + height;
       gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+      gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, 12), gl.DYNAMIC_DRAW);
       gl.uniform4f(gl.getUniformLocation(this.shapeProgram!, "u_color"), ...color);
       gl.uniform1f(gl.getUniformLocation(this.shapeProgram!, "u_rotation"), rotation);
       gl.uniform2f(gl.getUniformLocation(this.shapeProgram!, "u_rotationCenter"), centerX, centerY);
@@ -1066,10 +1070,18 @@ export class WebGLRenderer {
       const commands = parsePath(d);
       if (commands.length === 0) return;
 
-      const fillVertices = fill ? new Float32Array(pathToFillVertices(commands)) : new Float32Array(0);
-      const strokeVertices = stroke
-        ? new Float32Array(pathToStrokeVertices(commands, stroke.width))
-        : new Float32Array(0);
+      let fillVertices: Float32Array;
+      let strokeVertices: Float32Array;
+
+      try {
+        fillVertices = fill ? new Float32Array(pathToFillVertices(commands)) : new Float32Array(0);
+        strokeVertices = stroke ? new Float32Array(pathToStrokeVertices(commands, stroke.width)) : new Float32Array(0);
+      } catch (e) {
+        // Path parsing can fail for complex/degenerate geometries
+        console.warn("Failed to parse path:", id, e);
+        fillVertices = new Float32Array(0);
+        strokeVertices = new Float32Array(0);
+      }
 
       // Calculate native bounds from vertices
       let minX = Infinity;
@@ -1373,22 +1385,22 @@ export class WebGLRenderer {
     const nx = (-dy / len) * (adjustedWidth / 2);
     const ny = (dx / len) * (adjustedWidth / 2);
 
-    const v = new Float32Array([
-      p1.x - nx,
-      p1.y - ny,
-      p1.x + nx,
-      p1.y + ny,
-      p2.x - nx,
-      p2.y - ny,
-      p2.x - nx,
-      p2.y - ny,
-      p1.x + nx,
-      p1.y + ny,
-      p2.x + nx,
-      p2.y + ny,
-    ]);
+    // Performance: Use pooled buffer to avoid allocations
+    const v = this.vertexPool12;
+    v[0] = p1.x - nx;
+    v[1] = p1.y - ny;
+    v[2] = p1.x + nx;
+    v[3] = p1.y + ny;
+    v[4] = p2.x - nx;
+    v[5] = p2.y - ny;
+    v[6] = p2.x - nx;
+    v[7] = p2.y - ny;
+    v[8] = p1.x + nx;
+    v[9] = p1.y + ny;
+    v[10] = p2.x + nx;
+    v[11] = p2.y + ny;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, v, gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, v.subarray(0, 12), gl.DYNAMIC_DRAW);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
@@ -1401,44 +1413,41 @@ export class WebGLRenderer {
     // Blue border #0099ff
     const strokeColor: [number, number, number, number] = [0, 0.6, 1, 1];
 
-    // Outer (border)
+    // Performance: Use pooled buffer for outer (border)
     gl.uniform4f(gl.getUniformLocation(this.shapeProgram!, "u_color"), ...strokeColor);
-    const outerVerts = new Float32Array([
-      x - hs - hb,
-      y - hs - hb,
-      x + hs + hb,
-      y - hs - hb,
-      x - hs - hb,
-      y + hs + hb,
-      x - hs - hb,
-      y + hs + hb,
-      x + hs + hb,
-      y - hs - hb,
-      x + hs + hb,
-      y + hs + hb,
-    ]);
+    const v = this.vertexPool12;
+    v[0] = x - hs - hb;
+    v[1] = y - hs - hb;
+    v[2] = x + hs + hb;
+    v[3] = y - hs - hb;
+    v[4] = x - hs - hb;
+    v[5] = y + hs + hb;
+    v[6] = x - hs - hb;
+    v[7] = y + hs + hb;
+    v[8] = x + hs + hb;
+    v[9] = y - hs - hb;
+    v[10] = x + hs + hb;
+    v[11] = y + hs + hb;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, outerVerts, gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, v.subarray(0, 12), gl.DYNAMIC_DRAW);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-    // Inner (white fill)
+    // Inner (white fill) - reuse pooled buffer
     gl.uniform4f(gl.getUniformLocation(this.shapeProgram!, "u_color"), 1, 1, 1, 1);
-    const innerVerts = new Float32Array([
-      x - hs,
-      y - hs,
-      x + hs,
-      y - hs,
-      x - hs,
-      y + hs,
-      x - hs,
-      y + hs,
-      x + hs,
-      y - hs,
-      x + hs,
-      y + hs,
-    ]);
+    v[0] = x - hs;
+    v[1] = y - hs;
+    v[2] = x + hs;
+    v[3] = y - hs;
+    v[4] = x - hs;
+    v[5] = y + hs;
+    v[6] = x - hs;
+    v[7] = y + hs;
+    v[8] = x + hs;
+    v[9] = y - hs;
+    v[10] = x + hs;
+    v[11] = y + hs;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, innerVerts, gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, v.subarray(0, 12), gl.DYNAMIC_DRAW);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 

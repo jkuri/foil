@@ -234,6 +234,22 @@ const getDescendants = (
   return collected;
 };
 
+// Performance: Cached element index map for O(1) lookups
+let elementIndexMap: Map<string, number> | null = null;
+let lastElements: CanvasElement[] | null = null;
+
+function getElementIndex(elements: CanvasElement[], id: string): number {
+  // Invalidate cache if elements array changed
+  if (elements !== lastElements) {
+    elementIndexMap = new Map();
+    for (let i = 0; i < elements.length; i++) {
+      elementIndexMap.set(elements[i].id, i);
+    }
+    lastElements = elements;
+  }
+  return elementIndexMap?.get(id) ?? -1;
+}
+
 export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => ({
   // Initial state
   elements: [],
@@ -268,25 +284,35 @@ export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => 
   addElement: (element) => set((state) => ({ elements: [...state.elements, element], selectedIds: [element.id] })),
 
   updateElement: (id, updates) =>
-    set((state) => ({
-      elements: state.elements.map((el) => {
-        if (el.id === id) {
-          return { ...el, ...updates } as CanvasElement;
-        }
-        return el;
-      }),
-    })),
+    set((state) => {
+      // Performance: Use cached index map for O(1) lookup
+      const index = getElementIndex(state.elements, id);
+      if (index === -1) return state;
+
+      const newElements = [...state.elements];
+      newElements[index] = { ...newElements[index], ...updates } as CanvasElement;
+      return { elements: newElements };
+    }),
 
   updateElements: (updates) =>
-    set((state) => ({
-      elements: state.elements.map((el) => {
-        const update = updates.get(el.id);
-        if (update) {
-          return { ...el, ...update } as CanvasElement;
+    set((state) => {
+      // Performance: Skip if no updates
+      if (updates.size === 0) return state;
+
+      // Performance: Use cached index map for O(1) lookups
+      const newElements = [...state.elements];
+      let hasChanges = false;
+
+      for (const [id, update] of updates) {
+        const index = getElementIndex(state.elements, id);
+        if (index !== -1) {
+          newElements[index] = { ...newElements[index], ...update } as CanvasElement;
+          hasChanges = true;
         }
-        return el;
-      }),
-    })),
+      }
+
+      return hasChanges ? { elements: newElements } : state;
+    }),
 
   deleteElement: (id) =>
     set((state) => {
@@ -942,8 +968,12 @@ export const useCanvasStore = create<CanvasState & CanvasActions>((set, get) => 
   setGridSize: (size) => set({ gridSize: Math.max(1, size) }),
   setSmartGuides: (guides) => set({ smartGuides: guides }),
 
-  // Helpers
-  getElementById: (id) => get().elements.find((e) => e.id === id),
+  // Helpers - Performance: Use cached index map for O(1) lookups
+  getElementById: (id) => {
+    const elements = get().elements;
+    const index = getElementIndex(elements, id);
+    return index >= 0 ? elements[index] : undefined;
+  },
 
   getSelectedElements: () => {
     const state = get();

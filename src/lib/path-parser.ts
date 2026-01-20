@@ -385,7 +385,15 @@ export function pathToFillVertices(commands: PathCommand[], segmentsPerCurve = 1
 
   // 3. Compute Union of all polygons using polygon-clipping
   // This resolves overlaps between adjacent characters (if any) and cleans up geometry.
-  const unioned = polygonClipping.union(polygons);
+  let unioned: polygonClipping.MultiPolygon;
+  try {
+    unioned = polygonClipping.union(polygons);
+  } catch {
+    // polygon-clipping can fail on degenerate/complex geometries
+    // Fall back to using the original polygons without union
+    console.warn("polygon-clipping union failed, using original polygons");
+    unioned = polygons;
+  }
 
   // 4. Triangulate the result
   const allVertices: number[] = [];
