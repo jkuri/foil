@@ -1283,7 +1283,7 @@ export function useCanvasInteractions({
         if (isSingleRotatedElement && originalElements.size === 1) {
           const [id, original] = [...originalElements.entries()][0];
 
-          if (original.type === "rect") {
+          if (original.type === "rect" || original.type === "image") {
             const cos = Math.cos(elementRotation);
             const sin = Math.sin(elementRotation);
             const cosNeg = Math.cos(-elementRotation);
@@ -1586,7 +1586,7 @@ export function useCanvasInteractions({
             const newW = Math.max(1, relW * newBoundsWidth);
             const newH = Math.max(1, relH * newBoundsHeight);
 
-            if (original.type === "rect") {
+            if (original.type === "rect" || original.type === "image") {
               updates.set(id, { x: newX, y: newY, width: newW, height: newH });
             } else if (original.type === "ellipse") {
               updates.set(id, {
