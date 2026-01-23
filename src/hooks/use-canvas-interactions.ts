@@ -9,7 +9,6 @@ import {
 } from "@/core";
 import { type Bounds, calculateSnaps, createSnapState, getBounds, type SnapState } from "@/core/snapping";
 import { resizePath } from "@/lib/svg-import";
-
 import { useCanvasStore } from "@/store";
 import type { BoundingBox, CanvasElement, ResizeHandle, Shape, SmartGuide } from "@/types";
 import { getElementBounds } from "@/types";

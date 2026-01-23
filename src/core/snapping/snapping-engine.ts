@@ -2,7 +2,7 @@ import type { CanvasElement, SmartGuide } from "@/types";
 import type { Bounds, Point, SnapLine, SnapResult, SnapState } from "./types";
 
 export function createSnapState(elements: CanvasElement[], excludeIds: Set<string>): SnapState {
-  const eligible = elements.filter((e) => !excludeIds.has(e.id) && e.type !== "group");
+  const eligible = elements.filter((e) => !excludeIds.has(e.id) && !e.parentId);
 
   const verticalLines: SnapLine[] = [];
   const horizontalLines: SnapLine[] = [];
@@ -441,6 +441,38 @@ export function getBounds(element: CanvasElement, allElements: CanvasElement[]):
       }
     }
     if (minX === Infinity) return { minX: 0, minY: 0, maxX: 0, maxY: 0, centerX: 0, centerY: 0 };
+
+    if (element.rotation && element.rotation !== 0) {
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+
+      const corners = [
+        { x: minX, y: minY },
+        { x: maxX, y: minY },
+        { x: maxX, y: maxY },
+        { x: minX, y: maxY },
+      ];
+
+      const cos = Math.cos(element.rotation);
+      const sin = Math.sin(element.rotation);
+
+      const rotatedCorners = corners.map((corner) => {
+        const dx = corner.x - centerX;
+        const dy = corner.y - centerY;
+        return {
+          x: centerX + dx * cos - dy * sin,
+          y: centerY + dx * sin + dy * cos,
+        };
+      });
+
+      minX = Math.min(...rotatedCorners.map((c) => c.x));
+      minY = Math.min(...rotatedCorners.map((c) => c.y));
+      maxX = Math.max(...rotatedCorners.map((c) => c.x));
+      maxY = Math.max(...rotatedCorners.map((c) => c.y));
+
+      return { minX, minY, maxX, maxY, centerX, centerY };
+    }
+
     return { minX, minY, maxX, maxY, centerX: (minX + maxX) / 2, centerY: (minY + maxY) / 2 };
   }
 
