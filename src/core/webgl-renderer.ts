@@ -3,8 +3,10 @@ import type {
   CanvasElement,
   EllipseElement,
   GroupElement,
+  LinearGradient,
   LineElement,
   PathElement,
+  RadialGradient,
   RectElement,
   SelectionBox,
   Shape,
@@ -23,7 +25,14 @@ import {
 } from "./webgl/renderers/overlay-renderer";
 import { drawPath } from "./webgl/renderers/path-renderer";
 import { drawRect } from "./webgl/renderers/rect-renderer";
-import { FRAGMENT_SHADER, GRID_FRAGMENT_SHADER, GRID_VERTEX_SHADER, VERTEX_SHADER } from "./webgl/shaders";
+import {
+  FRAGMENT_SHADER,
+  GRADIENT_FRAGMENT_SHADER,
+  GRADIENT_VERTEX_SHADER,
+  GRID_FRAGMENT_SHADER,
+  GRID_VERTEX_SHADER,
+  VERTEX_SHADER,
+} from "./webgl/shaders";
 import type { RenderContext } from "./webgl/types";
 import { createProgram } from "./webgl/utils";
 
@@ -34,19 +43,23 @@ type GetStateFunc = () => {
   selectionBox: SelectionBox | null;
   canvasBackground: string;
   canvasBackgroundVisible: boolean;
+  gradients: Map<string, LinearGradient | RadialGradient>;
 };
 
 export class WebGLRenderer {
   private gl: WebGLRenderingContext;
   private canvas: HTMLCanvasElement;
   private shapeProgram: WebGLProgram | null = null;
+  private gradientProgram: WebGLProgram | null = null;
   private gridProgram: WebGLProgram | null = null;
   private positionBuffer: WebGLBuffer | null = null;
+  private uvBuffer: WebGLBuffer | null = null;
   private quadBuffer: WebGLBuffer | null = null;
   private animationId: number | null = null;
   private needsRender = true;
   private lastTransform: Transform | null = null;
   private getState: GetStateFunc | null = null;
+  private gradients: Map<string, LinearGradient | RadialGradient> = new Map();
 
   private vertexPool12 = new Float32Array(24);
 
@@ -60,8 +73,10 @@ export class WebGLRenderer {
 
   private init(): void {
     this.shapeProgram = createProgram(this.gl, VERTEX_SHADER, FRAGMENT_SHADER);
+    this.gradientProgram = createProgram(this.gl, GRADIENT_VERTEX_SHADER, GRADIENT_FRAGMENT_SHADER);
     this.gridProgram = createProgram(this.gl, GRID_VERTEX_SHADER, GRID_FRAGMENT_SHADER);
     this.positionBuffer = this.gl.createBuffer();
+    this.uvBuffer = this.gl.createBuffer();
     this.quadBuffer = this.gl.createBuffer();
 
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.quadBuffer);
@@ -115,12 +130,18 @@ export class WebGLRenderer {
     }
   }
 
-  private getRenderContext(): RenderContext {
+  private getRenderContext(resolution: [number, number], translation: [number, number], scale: number): RenderContext {
     return {
       gl: this.gl,
       program: this.shapeProgram!,
+      gradientProgram: this.gradientProgram!,
       positionBuffer: this.positionBuffer!,
+      uvBuffer: this.uvBuffer!,
       vertexPool: this.vertexPool12,
+      gradients: this.gradients,
+      resolution,
+      translation,
+      scale,
     };
   }
 
@@ -131,9 +152,11 @@ export class WebGLRenderer {
     selectionBox: SelectionBox | null;
     canvasBackground: string;
     canvasBackgroundVisible: boolean;
+    gradients: Map<string, LinearGradient | RadialGradient>;
   }): void {
     const gl = this.gl;
-    const { transform, elements, selectedIds, selectionBox, canvasBackground, canvasBackgroundVisible } = state;
+    const { transform, elements, selectedIds, selectionBox, canvasBackground, canvasBackgroundVisible, gradients } = state;
+    this.gradients = gradients;
     const { x, y, scale } = transform;
     const dpr = window.devicePixelRatio;
 
@@ -183,7 +206,7 @@ export class WebGLRenderer {
       const visibleMaxY = (this.canvas.height / dpr - y) / scale;
       const visibleBounds = { minX: visibleMinX, minY: visibleMinY, maxX: visibleMaxX, maxY: visibleMaxY };
 
-      const ctx = this.getRenderContext();
+      const ctx = this.getRenderContext([this.canvas.width, this.canvas.height], [x * dpr, y * dpr], scale);
 
       for (const element of elements) {
         if (element.visible === false) continue;
@@ -320,8 +343,10 @@ export class WebGLRenderer {
   destroy(): void {
     this.stopRenderLoop();
     if (this.shapeProgram) this.gl.deleteProgram(this.shapeProgram);
+    if (this.gradientProgram) this.gl.deleteProgram(this.gradientProgram);
     if (this.gridProgram) this.gl.deleteProgram(this.gridProgram);
     if (this.positionBuffer) this.gl.deleteBuffer(this.positionBuffer);
+    if (this.uvBuffer) this.gl.deleteBuffer(this.uvBuffer);
     if (this.quadBuffer) this.gl.deleteBuffer(this.quadBuffer);
   }
 }

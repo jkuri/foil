@@ -1,5 +1,5 @@
 import { get, set } from "idb-keyval";
-import type { CanvasElement } from "@/types";
+import type { CanvasElement, LinearGradient, RadialGradient } from "@/types";
 
 const DB_KEY = "canvas-history";
 const MAX_HISTORY_SIZE = 50;
@@ -8,6 +8,7 @@ export interface CanvasSnapshot {
   elements: CanvasElement[];
   canvasBackground: string;
   canvasBackgroundVisible: boolean;
+  gradients?: Map<string, LinearGradient | RadialGradient>;
   timestamp: number;
 }
 
@@ -85,12 +86,28 @@ class CanvasHistoryManager {
     this.saveToIndexedDB();
   }
 
+  private serializeSnapshot(snapshot: CanvasSnapshot): CanvasSnapshot {
+    return {
+      ...snapshot,
+      gradients: snapshot.gradients
+        ? (Array.from(snapshot.gradients.entries()) as unknown as Map<string, LinearGradient | RadialGradient>)
+        : undefined,
+    };
+  }
+
+  private deserializeSnapshot(snapshot: CanvasSnapshot): CanvasSnapshot {
+    return {
+      ...snapshot,
+      gradients: snapshot.gradients ? new Map(snapshot.gradients as unknown as [string, LinearGradient | RadialGradient][]) : undefined,
+    };
+  }
+
   async saveToIndexedDB(): Promise<void> {
     try {
       const data: HistoryData = {
-        undoStack: this.undoStack,
-        redoStack: this.redoStack,
-        current: this.current,
+        undoStack: this.undoStack.map((s) => this.serializeSnapshot(s)),
+        redoStack: this.redoStack.map((s) => this.serializeSnapshot(s)),
+        current: this.current ? this.serializeSnapshot(this.current) : null,
       };
       await set(DB_KEY, data);
     } catch (error) {
@@ -102,9 +119,9 @@ class CanvasHistoryManager {
     try {
       const data = await get<HistoryData>(DB_KEY);
       if (data) {
-        this.undoStack = data.undoStack || [];
-        this.redoStack = data.redoStack || [];
-        this.current = data.current || null;
+        this.undoStack = (data.undoStack || []).map((s) => this.deserializeSnapshot(s));
+        this.redoStack = (data.redoStack || []).map((s) => this.deserializeSnapshot(s));
+        this.current = data.current ? this.deserializeSnapshot(data.current) : null;
         return this.current;
       }
     } catch (error) {

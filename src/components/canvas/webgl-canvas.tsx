@@ -42,6 +42,7 @@ export function WebGLCanvas({ isReady = false }: WebGLCanvasProps) {
     selectionBox,
     canvasBackground,
     canvasBackgroundVisible,
+    gradients,
     isViewMode,
     importElements,
     loadFromStorage,
@@ -129,7 +130,7 @@ export function WebGLCanvas({ isReady = false }: WebGLCanvasProps) {
 
   useEffect(() => {
     rendererRef.current?.markDirty();
-  }, [elements, selectedIds, selectionBox, canvasBackground, canvasBackgroundVisible]);
+  }, [elements, selectedIds, selectionBox, canvasBackground, canvasBackgroundVisible, gradients]);
 
   useEffect(() => {
     const container = containerRef.current;

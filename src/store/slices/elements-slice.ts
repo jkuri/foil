@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import { canvasHistory } from "@/lib/canvas-history";
-import type { CanvasElement, GroupElement, Transform } from "@/types";
+import type { CanvasElement, GroupElement, LinearGradient, RadialGradient, Transform } from "@/types";
 import { cloneElement, generateCopyName, generateElementName, getDescendants, getElementIndex } from "../utils";
 
 export interface ElementsSlice {
@@ -54,6 +54,8 @@ interface StoreWithSelection {
   canvasBackground: string;
   canvasBackgroundVisible: boolean;
   transform: Transform;
+  gradients: Map<string, LinearGradient | RadialGradient>;
+  setGradients: (gradients: Map<string, LinearGradient | RadialGradient>) => void;
   panToCenter: () => void;
 }
 
@@ -514,6 +516,7 @@ export const createElementsSlice: StateCreator<ElementsSlice & StoreWithSelectio
       elements: state.elements,
       canvasBackground: state.canvasBackground,
       canvasBackgroundVisible: state.canvasBackgroundVisible,
+      gradients: state.gradients,
     });
   },
 
@@ -549,6 +552,7 @@ export const createElementsSlice: StateCreator<ElementsSlice & StoreWithSelectio
       canvasBackground: "#F5F5F5",
       canvasBackgroundVisible: true,
       transform: { x: 0, y: 0, scale: 1 },
+      gradients: new Map(),
     });
   },
 
@@ -560,6 +564,7 @@ export const createElementsSlice: StateCreator<ElementsSlice & StoreWithSelectio
       canvasBackground: state.canvasBackground,
       canvasBackgroundVisible: state.canvasBackgroundVisible,
       transform: state.transform,
+      gradients: Array.from(state.gradients.entries()),
       exportedAt: new Date().toISOString(),
     };
     const json = JSON.stringify(projectData, null, 2);
@@ -587,12 +592,15 @@ export const createElementsSlice: StateCreator<ElementsSlice & StoreWithSelectio
         if (data.elements && Array.isArray(data.elements)) {
           canvasHistory.clear();
 
+          const gradients = data.gradients ? new Map(data.gradients) : new Map();
+
           set({
             elements: data.elements,
             selectedIds: [],
             canvasBackground: data.canvasBackground || "#F5F5F5",
             canvasBackgroundVisible: data.canvasBackgroundVisible ?? true,
             transform: data.transform || { x: 0, y: 0, scale: 1 },
+            gradients,
           });
         } else {
           console.error("Invalid project file format");

@@ -5,9 +5,12 @@ import type { Shape } from "@/types";
 import { FillSection } from "../fill-section";
 
 vi.mock("@/store", () => ({
-  useCanvasStore: (selector: (state: { updateElements: unknown }) => unknown) => {
+  useCanvasStore: (selector: (state: Record<string, unknown>) => unknown) => {
     return selector({
       updateElements: vi.fn(),
+      gradients: new Map(),
+      addGradient: vi.fn(),
+      updateGradient: vi.fn(),
     });
   },
 }));
@@ -18,6 +21,10 @@ vi.mock("@hugeicons/react", () => ({
 vi.mock("@hugeicons/core-free-icons", () => ({
   PlusSignIcon: "plus-icon",
   MinusSignIcon: "minus-icon",
+  UnfoldMoreIcon: "unfold-more-icon",
+  ArrowDown01Icon: "arrow-down-icon",
+  ArrowUp01Icon: "arrow-up-icon",
+  Tick02Icon: "tick-icon",
 }));
 
 vi.mock("@/components/ui/button", () => ({
@@ -29,6 +36,12 @@ vi.mock("@/components/ui/button", () => ({
 }));
 vi.mock("@/components/shared/color-input", () => ({
   ColorInput: () => <div data-testid="color-input" />,
+}));
+vi.mock("@/components/shared/fill-type-selector", () => ({
+  FillTypeSelector: ({ value }: { value: string }) => <div data-testid="fill-type-selector">{value}</div>,
+}));
+vi.mock("@/components/shared/gradient-picker", () => ({
+  GradientPicker: () => <div data-testid="gradient-picker" />,
 }));
 vi.mock("../shared", () => ({
   SectionHeader: ({ title }: { title: string }) => <div>{title}</div>,
@@ -56,6 +69,7 @@ describe("FillSection", () => {
     };
     render(<FillSection elements={[rect]} />);
     expect(screen.getByText("Fill")).toBeDefined();
+    expect(screen.getByTestId("fill-type-selector")).toBeDefined();
     expect(screen.getByTestId("color-input")).toBeDefined();
   });
 });

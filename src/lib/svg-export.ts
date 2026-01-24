@@ -1,7 +1,32 @@
 import { SVGPathData } from "svg-pathdata";
 import { useCanvasStore } from "@/store";
-import type { CanvasElement, Shape } from "@/types";
+import type { CanvasElement, Fill, LinearGradient, RadialGradient, Shape } from "@/types";
 import { optimizeSVG } from "./svgo";
+
+function isGradientFill(fill: Fill): fill is { ref: string; type: "gradient" } {
+  return fill !== null && typeof fill === "object" && fill.type === "gradient";
+}
+
+function gradientToSVGDef(gradient: LinearGradient | RadialGradient, id: string): string {
+  const stops = gradient.stops
+    .slice()
+    .sort((a, b) => a.offset - b.offset)
+    .map((stop) => {
+      const opacity = stop.opacity !== undefined && stop.opacity !== 1 ? ` stop-opacity="${stop.opacity}"` : "";
+      return `      <stop offset="${(stop.offset * 100).toFixed(1)}%" stop-color="${stop.color}"${opacity}/>`;
+    })
+    .join("\n");
+
+  if (gradient.type === "linearGradient") {
+    return `    <linearGradient id="${id}" x1="${(gradient.x1 * 100).toFixed(1)}%" y1="${(gradient.y1 * 100).toFixed(1)}%" x2="${(gradient.x2 * 100).toFixed(1)}%" y2="${(gradient.y2 * 100).toFixed(1)}%">
+${stops}
+    </linearGradient>`;
+  } else {
+    return `    <radialGradient id="${id}" cx="${(gradient.cx * 100).toFixed(1)}%" cy="${(gradient.cy * 100).toFixed(1)}%" r="${(gradient.r * 100).toFixed(1)}%">
+${stops}
+    </radialGradient>`;
+  }
+}
 
 function measurePathNativeBounds(d: string): { x: number; y: number } | null {
   if (!d?.trim()) return null;
@@ -185,13 +210,22 @@ function calculateBounds(elements: CanvasElement[], allElements: CanvasElement[]
   };
 }
 
-function getFillStroke(element: Shape): string {
+function getFillStroke(element: Shape, usedGradients: Set<string>): string {
   const attrs: string[] = [];
 
   if (element.fill) {
-    attrs.push(`fill="${element.fill}"`);
+    if (isGradientFill(element.fill)) {
+      attrs.push(`fill="url(#${element.fill.ref})"`);
+      usedGradients.add(element.fill.ref);
+    } else {
+      attrs.push(`fill="${element.fill}"`);
+    }
   } else {
     attrs.push('fill="none"');
+  }
+
+  if (element.fillOpacity !== undefined && element.fillOpacity !== 1) {
+    attrs.push(`fill-opacity="${element.fillOpacity}"`);
   }
 
   if (element.stroke) {
@@ -242,19 +276,19 @@ function getTransform(element: CanvasElement): string {
   return ` transform="rotate(${degrees.toFixed(2)} ${cx.toFixed(2)} ${cy.toFixed(2)})"`;
 }
 
-function elementToSVGOriginal(element: CanvasElement, allElements: CanvasElement[], indent = "  "): string {
+function elementToSVGOriginal(element: CanvasElement, allElements: CanvasElement[], usedGradients: Set<string>, indent = "  "): string {
   const transform = getTransform(element);
 
   switch (element.type) {
     case "rect": {
       const rx = element.rx ? ` rx="${element.rx}"` : "";
       const ry = element.ry ? ` ry="${element.ry}"` : "";
-      return `${indent}<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}"${rx}${ry}${getFillStroke(element)}${transform}/>`;
+      return `${indent}<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}"${rx}${ry}${getFillStroke(element, usedGradients)}${transform}/>`;
     }
     case "ellipse":
-      return `${indent}<ellipse cx="${element.cx}" cy="${element.cy}" rx="${element.rx}" ry="${element.ry}"${getFillStroke(element)}${transform}/>`;
+      return `${indent}<ellipse cx="${element.cx}" cy="${element.cy}" rx="${element.rx}" ry="${element.ry}"${getFillStroke(element, usedGradients)}${transform}/>`;
     case "line":
-      return `${indent}<line x1="${element.x1}" y1="${element.y1}" x2="${element.x2}" y2="${element.y2}"${getFillStroke(element)}${transform}/>`;
+      return `${indent}<line x1="${element.x1}" y1="${element.y1}" x2="${element.x2}" y2="${element.y2}"${getFillStroke(element, usedGradients)}${transform}/>`;
     case "path": {
       const nativeBounds = measurePathNativeBounds(element.d);
       let pathTransform = transform;
@@ -272,20 +306,20 @@ function elementToSVGOriginal(element: CanvasElement, allElements: CanvasElement
           }
         }
       }
-      return `${indent}<path d="${element.d}"${getFillStroke(element)}${pathTransform}/>`;
+      return `${indent}<path d="${element.d}"${getFillStroke(element, usedGradients)}${pathTransform}/>`;
     }
     case "text": {
       const fontWeight = element.fontWeight && element.fontWeight !== "normal" ? ` font-weight="${element.fontWeight}"` : "";
       const textAnchor = element.textAnchor && element.textAnchor !== "start" ? ` text-anchor="${element.textAnchor}"` : "";
-      return `${indent}<text x="${element.x}" y="${element.y}" font-family="${element.fontFamily}" font-size="${element.fontSize}"${fontWeight}${textAnchor}${getFillStroke(element)}${transform}>${element.text}</text>`;
+      return `${indent}<text x="${element.x}" y="${element.y}" font-family="${element.fontFamily}" font-size="${element.fontSize}"${fontWeight}${textAnchor}${getFillStroke(element, usedGradients)}${transform}>${element.text}</text>`;
     }
     case "polygon": {
       const points = element.points.map((p) => `${p.x},${p.y}`).join(" ");
-      return `${indent}<polygon points="${points}"${getFillStroke(element)}${transform}/>`;
+      return `${indent}<polygon points="${points}"${getFillStroke(element, usedGradients)}${transform}/>`;
     }
     case "polyline": {
       const points = element.points.map((p) => `${p.x},${p.y}`).join(" ");
-      return `${indent}<polyline points="${points}"${getFillStroke(element)}${transform}/>`;
+      return `${indent}<polyline points="${points}"${getFillStroke(element, usedGradients)}${transform}/>`;
     }
     case "image": {
       const preserveAspect = element.preserveAspectRatio ? ` preserveAspectRatio="${element.preserveAspectRatio}"` : "";
@@ -295,7 +329,7 @@ function elementToSVGOriginal(element: CanvasElement, allElements: CanvasElement
       const children = element.childIds
         .map((id) => allElements.find((e) => e.id === id))
         .filter(Boolean)
-        .map((child) => elementToSVGOriginal(child!, allElements, `${indent}  `));
+        .map((child) => elementToSVGOriginal(child!, allElements, usedGradients, `${indent}  `));
       const name = element.name ? ` id="${element.name.replace(/\s+/g, "-").toLowerCase()}"` : "";
       return `${indent}<g${name}${transform}>\n${children.join("\n")}\n${indent}</g>`;
     }
@@ -304,18 +338,34 @@ function elementToSVGOriginal(element: CanvasElement, allElements: CanvasElement
 
 export function exportToSVG(elements: CanvasElement[], allElements: CanvasElement[]): string {
   const bounds = calculateBounds(elements, allElements);
+  const usedGradients = new Set<string>();
 
-  const svgElements = elements.map((el) => elementToSVGOriginal(el, allElements, "    ")).join("\n");
+  const svgElements = elements.map((el) => elementToSVGOriginal(el, allElements, usedGradients, "    ")).join("\n");
 
   const translateX = -bounds.x;
   const translateY = -bounds.y;
+
+  let defsSection = "";
+  if (usedGradients.size > 0) {
+    const gradients = useCanvasStore.getState().gradients;
+    const gradientDefs: string[] = [];
+    for (const gradientId of usedGradients) {
+      const gradient = gradients.get(gradientId);
+      if (gradient) {
+        gradientDefs.push(gradientToSVGDef(gradient, gradientId));
+      }
+    }
+    if (gradientDefs.length > 0) {
+      defsSection = `  <defs>\n${gradientDefs.join("\n")}\n  </defs>\n`;
+    }
+  }
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg"
      viewBox="0 0 ${bounds.width.toFixed(2)} ${bounds.height.toFixed(2)}"
      width="${bounds.width.toFixed(2)}"
      height="${bounds.height.toFixed(2)}">
-  <g transform="translate(${translateX.toFixed(2)}, ${translateY.toFixed(2)})">
+${defsSection}  <g transform="translate(${translateX.toFixed(2)}, ${translateY.toFixed(2)})">
 ${svgElements}
   </g>
 </svg>`;
