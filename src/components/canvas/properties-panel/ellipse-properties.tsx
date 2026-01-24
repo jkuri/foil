@@ -72,11 +72,11 @@ export function EllipseProperties({ element }: EllipsePropertiesProps) {
 
         <Separator />
 
-        <FillSection element={element} />
+        <FillSection elements={[element]} />
 
         <Separator />
 
-        <StrokeSection element={element} />
+        <StrokeSection elements={[element]} />
 
         <Separator />
 

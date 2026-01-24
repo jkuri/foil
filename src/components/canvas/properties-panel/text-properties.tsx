@@ -221,7 +221,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
 
         <Separator />
 
-        <FillSection element={element} />
+        <FillSection elements={[element]} />
 
         <Separator />
 

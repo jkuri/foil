@@ -81,7 +81,7 @@ export function LineProperties({ element }: LinePropertiesProps) {
 
         <Separator />
 
-        <StrokeSection element={element} showMarkers />
+        <StrokeSection elements={[element]} showMarkers />
 
         <Separator />
 

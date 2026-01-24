@@ -65,11 +65,11 @@ export function RectProperties({ element }: RectPropertiesProps) {
 
         <Separator />
 
-        <FillSection element={element} />
+        <FillSection elements={[element]} />
 
         <Separator />
 
-        <StrokeSection element={element} />
+        <StrokeSection elements={[element]} />
 
         <Separator />
 

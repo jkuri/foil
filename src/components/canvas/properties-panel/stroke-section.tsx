@@ -10,13 +10,34 @@ import { LineMarkerSelect } from "../line-marker-select";
 import { SectionHeader, WeightIcon } from "./shared";
 
 interface StrokeSectionProps {
-  element: Shape;
+  elements: Shape[];
   showMarkers?: boolean;
 }
 
-export function StrokeSection({ element, showMarkers = false }: StrokeSectionProps) {
-  const updateElement = useCanvasStore((s) => s.updateElement);
-  const isLine = element.type === "line";
+export function StrokeSection({ elements, showMarkers = false }: StrokeSectionProps) {
+  const updateElements = useCanvasStore((s) => s.updateElements);
+
+  const allLines = elements.every((e) => e.type === "line");
+  const hasStroke = elements.some((e) => e.stroke);
+
+  const uniqueColors = new Set(
+    elements.map((e) => {
+      if (e.stroke && typeof e.stroke.color === "string") return e.stroke.color;
+      return null;
+    }),
+  );
+  const displayColor =
+    uniqueColors.size === 1 ? (elements[0].stroke?.color ?? "#000000") : (elements[0].stroke?.color ?? "#000000");
+  const isMixedColor = uniqueColors.size > 1;
+
+  const uniqueWidths = new Set(elements.map((e) => e.stroke?.width));
+  const displayWidth = uniqueWidths.size === 1 ? (elements[0].stroke?.width ?? 1) : (elements[0].stroke?.width ?? 1);
+
+  const uniqueOpacities = new Set(elements.map((e) => e.stroke?.opacity));
+  const displayOpacity =
+    uniqueOpacities.size === 1 ? (elements[0].stroke?.opacity ?? 1) : (elements[0].stroke?.opacity ?? 1);
+
+  const displayDashArray = elements[0].stroke?.dashArray;
 
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -27,37 +48,54 @@ export function StrokeSection({ element, showMarkers = false }: StrokeSectionPro
           variant="ghost"
           className="h-4 w-4 text-muted-foreground hover:text-foreground"
           onClick={() => {
-            if (!element.stroke) {
-              updateElement(element.id, { stroke: { color: "#000000", width: 1, dashArray: [] } });
-            }
+            const updates = new Map<string, Record<string, unknown>>();
+            elements.forEach((element) => {
+              if (!element.stroke) {
+                updates.set(element.id, { stroke: { color: "#000000", width: 1, dashArray: [] } });
+              }
+            });
+            if (updates.size > 0) updateElements(updates);
           }}
         >
           <HugeiconsIcon icon={PlusSignIcon} className="size-3" />
         </Button>
       </div>
 
-      {element.stroke && (
+      {hasStroke && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <ColorInput
               className="flex-1"
-              value={typeof element.stroke.color === "string" ? element.stroke.color : "#000000"}
-              opacity={element.stroke.opacity ?? 1}
+              value={typeof displayColor === "string" ? displayColor : "#000000"}
+              opacity={displayOpacity}
+              isMixed={isMixedColor}
               onChange={(color, newOpacity) => {
-                updateElement(element.id, {
-                  stroke: {
-                    ...element.stroke!,
-                    color,
-                    ...(newOpacity !== undefined && { opacity: newOpacity }),
-                  },
+                const updates = new Map<string, Record<string, unknown>>();
+                elements.forEach((element) => {
+                  if (element.stroke) {
+                    updates.set(element.id, {
+                      stroke: {
+                        ...element.stroke,
+                        color,
+                        ...(newOpacity !== undefined && { opacity: newOpacity }),
+                      },
+                    });
+                  }
                 });
+                updateElements(updates);
               }}
             />
             <Button
               variant="ghost"
               size="icon"
               className="h-6 w-6 text-muted-foreground hover:text-foreground"
-              onClick={() => updateElement(element.id, { stroke: null })}
+              onClick={() => {
+                const updates = new Map<string, Record<string, unknown>>();
+                elements.forEach((element) => {
+                  updates.set(element.id, { stroke: null });
+                });
+                updateElements(updates);
+              }}
             >
               <HugeiconsIcon icon={MinusSignIcon} className="size-3.5" />
             </Button>
@@ -67,32 +105,39 @@ export function StrokeSection({ element, showMarkers = false }: StrokeSectionPro
             <span className="font-medium text-[10px] text-muted-foreground uppercase">Weight</span>
             <NumberInput
               icon={<WeightIcon />}
-              value={element.stroke.width}
-              onChange={(v) =>
-                updateElement(element.id, {
-                  stroke: { ...element.stroke!, width: v },
-                })
-              }
+              value={displayWidth}
+              onChange={(v) => {
+                const updates = new Map<string, Record<string, unknown>>();
+                elements.forEach((element) => {
+                  if (element.stroke) {
+                    updates.set(element.id, { stroke: { ...element.stroke, width: v } });
+                  }
+                });
+                updateElements(updates);
+              }}
               step={1}
             />
           </div>
 
           <Select
-            value={
-              element.stroke.dashArray?.length ? (element.stroke.dashArray[0] === 1 ? "dotted" : "dashed") : "solid"
-            }
+            value={displayDashArray?.length ? (displayDashArray[0] === 1 ? "dotted" : "dashed") : "solid"}
             onValueChange={(val) => {
               let dashArray: number[] = [];
               if (val === "dashed") dashArray = [6, 6];
               if (val === "dotted") dashArray = [1, 5];
-              updateElement(element.id, {
-                stroke: { ...element.stroke!, dashArray },
+
+              const updates = new Map<string, Record<string, unknown>>();
+              elements.forEach((element) => {
+                if (element.stroke) {
+                  updates.set(element.id, { stroke: { ...element.stroke, dashArray } });
+                }
               });
+              updateElements(updates);
             }}
           >
             <SelectTrigger className="w-full text-xs">
               <SelectValue>
-                {element.stroke.dashArray?.length ? (element.stroke.dashArray[0] === 1 ? "Dotted" : "Dashed") : "Solid"}
+                {displayDashArray?.length ? (displayDashArray[0] === 1 ? "Dotted" : "Dashed") : "Solid"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -102,20 +147,36 @@ export function StrokeSection({ element, showMarkers = false }: StrokeSectionPro
             </SelectContent>
           </Select>
 
-          {showMarkers && isLine && (
+          {showMarkers && allLines && (
             <div className="mt-1 grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1">
                 <span className="font-medium text-[10px] text-muted-foreground uppercase">Start</span>
                 <LineMarkerSelect
-                  value={(element as LineElement).markerStart || "none"}
-                  onChange={(val) => updateElement(element.id, { markerStart: val })}
+                  value={(elements[0] as LineElement).markerStart || "none"}
+                  onChange={(val) => {
+                    const updates = new Map<string, Record<string, unknown>>();
+                    elements.forEach((element) => {
+                      if (element.type === "line") {
+                        updates.set(element.id, { markerStart: val });
+                      }
+                    });
+                    updateElements(updates);
+                  }}
                 />
               </div>
               <div className="flex flex-col gap-1">
                 <span className="font-medium text-[10px] text-muted-foreground uppercase">End</span>
                 <LineMarkerSelect
-                  value={(element as LineElement).markerEnd || "none"}
-                  onChange={(val) => updateElement(element.id, { markerEnd: val })}
+                  value={(elements[0] as LineElement).markerEnd || "none"}
+                  onChange={(val) => {
+                    const updates = new Map<string, Record<string, unknown>>();
+                    elements.forEach((element) => {
+                      if (element.type === "line") {
+                        updates.set(element.id, { markerEnd: val });
+                      }
+                    });
+                    updateElements(updates);
+                  }}
                 />
               </div>
             </div>
