@@ -1,6 +1,6 @@
 import { createSnapState, type SnapState } from "@/core/snapping";
+import { getElementBounds } from "@/lib/element-utils";
 import type { CanvasElement } from "@/types";
-import { getElementBounds } from "@/types";
 import type { ElementData } from "./types";
 
 export function flattenCanvasElements(

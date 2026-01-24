@@ -1,12 +1,12 @@
 import { NumberInput } from "@/components/shared/number-input";
 import { Separator } from "@/components/ui/separator";
+import { getElementTransform } from "@/lib/element-utils";
 import { useCanvasStore } from "@/store";
 import type { EllipseElement } from "@/types";
 import { ExportSection } from "./export-section";
 import { FillSection } from "./fill-section";
 import { RotateIcon, SectionHeader } from "./shared";
 import { StrokeSection } from "./stroke-section";
-import { getElementBounds } from "./utils";
 
 interface EllipsePropertiesProps {
   element: EllipseElement;
@@ -14,7 +14,7 @@ interface EllipsePropertiesProps {
 
 export function EllipseProperties({ element }: EllipsePropertiesProps) {
   const updateElement = useCanvasStore((s) => s.updateElement);
-  const bounds = getElementBounds(element);
+  const bounds = getElementTransform(element);
 
   const updateBounds = (newBounds: { x?: number; y?: number; width?: number; height?: number }) => {
     const rx = newBounds.width !== undefined ? newBounds.width / 2 : element.rx;

@@ -1,4 +1,5 @@
-import { type GroupElement, getFillColor, type PathElement, type TextElement } from "@/types";
+import { getFillColor } from "@/lib/element-utils";
+import type { GroupElement, PathElement, TextElement } from "@/types";
 import { forEachGlyphCompound, getFont } from "./text-renderer";
 
 export interface TextConversionResult {

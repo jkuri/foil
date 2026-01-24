@@ -1,11 +1,10 @@
 import { useCallback, useRef } from "react";
 import { calculateBoundingBox, calculateGroupOBB } from "@/core";
+import { getElementBounds } from "@/lib/element-utils";
 import { resizeElementInGroup, resizeGroupChildrenOBB } from "@/lib/group-utils";
 import { resizePath } from "@/lib/svg-import";
-
 import { useCanvasStore } from "@/store";
 import type { BoundingBox, CanvasElement, GroupElement, ResizeHandle, Shape } from "@/types";
-import { getElementBounds } from "@/types";
 import { collectElementsForResize, flattenCanvasElements } from "./element-helpers";
 import type { ElementData, ResizeStartState } from "./types";
 

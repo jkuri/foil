@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { calculateGroupOBB, getRotatedCorners } from "@/core";
+import { getElementBounds } from "@/lib/element-utils";
 import { useCanvasStore } from "@/store";
 import type { CanvasElement, GroupElement, Shape } from "@/types";
-import { getElementBounds } from "@/types";
 
 export function useSelectionBounds() {
   const elements = useCanvasStore((s) => s.elements);

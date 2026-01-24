@@ -1,11 +1,11 @@
 import { NumberInput } from "@/components/shared/number-input";
 import { Separator } from "@/components/ui/separator";
+import { getElementTransform } from "@/lib/element-utils";
 import { useCanvasStore } from "@/store";
 import type { ImageElement } from "@/types";
 import { DimensionsSection } from "./dimensions-section";
 import { ExportSection } from "./export-section";
 import { RotateIcon, SectionHeader } from "./shared";
-import { getElementBounds } from "./utils";
 
 interface ImagePropertiesProps {
   element: ImageElement;
@@ -13,7 +13,7 @@ interface ImagePropertiesProps {
 
 export function ImageProperties({ element }: ImagePropertiesProps) {
   const updateElement = useCanvasStore((s) => s.updateElement);
-  const bounds = getElementBounds(element);
+  const bounds = getElementTransform(element);
 
   return (
     <div className="flex h-full flex-col gap-0 text-foreground text-xs">

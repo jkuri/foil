@@ -1,7 +1,7 @@
 import { useCallback } from "react";
+import { getElementBounds } from "@/lib/element-utils";
 import { parseSVG, translatePath } from "@/lib/svg-import";
 import type { CanvasElement } from "@/types";
-import { getElementBounds } from "@/types";
 
 interface UseFileDropProps {
   screenToWorld: (screenX: number, screenY: number) => { x: number; y: number };

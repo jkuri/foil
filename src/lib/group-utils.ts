@@ -1,6 +1,6 @@
+import { getElementBounds } from "@/lib/element-utils";
 import { resizePath } from "@/lib/svg-import";
 import type { CanvasElement, GroupElement } from "@/types";
-import { getElementBounds } from "@/types";
 
 export const getGroupBounds = (
   element: GroupElement,

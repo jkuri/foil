@@ -1,11 +1,11 @@
 import { NumberInput } from "@/components/shared/number-input";
 import { Separator } from "@/components/ui/separator";
+import { getElementTransform } from "@/lib/element-utils";
 import { useCanvasStore } from "@/store";
 import type { LineElement } from "@/types";
 import { ExportSection } from "./export-section";
 import { RotateIcon, SectionHeader } from "./shared";
 import { StrokeSection } from "./stroke-section";
-import { getElementBounds } from "./utils";
 
 interface LinePropertiesProps {
   element: LineElement;
@@ -13,7 +13,7 @@ interface LinePropertiesProps {
 
 export function LineProperties({ element }: LinePropertiesProps) {
   const updateElement = useCanvasStore((s) => s.updateElement);
-  const bounds = getElementBounds(element);
+  const bounds = getElementTransform(element);
 
   const updateBounds = (newBounds: { x?: number; y?: number; width?: number; rotation?: number }) => {
     const cx = newBounds.x ?? bounds.x;

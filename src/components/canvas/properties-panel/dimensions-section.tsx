@@ -2,9 +2,9 @@ import { SquareLock01Icon, SquareUnlock02Icon } from "@hugeicons/core-free-icons
 import { HugeiconsIcon } from "@hugeicons/react";
 import { NumberInput } from "@/components/shared/number-input";
 import { Button } from "@/components/ui/button";
+import { getElementTransform } from "@/lib/element-utils";
 import type { CanvasElement } from "@/types";
 import { SectionHeader } from "./shared";
-import { getElementBounds } from "./utils";
 
 interface DimensionsSectionProps {
   element: CanvasElement;
@@ -14,7 +14,7 @@ interface DimensionsSectionProps {
 
 export function DimensionsSection({ element, updateElement, bounds: providedBounds }: DimensionsSectionProps) {
   const isLocked = !!element.aspectRatioLocked;
-  const bounds = providedBounds ?? getElementBounds(element);
+  const bounds = providedBounds ?? getElementTransform(element);
 
   const toggleLock = () => {
     updateElement(element.id, { aspectRatioLocked: !isLocked });

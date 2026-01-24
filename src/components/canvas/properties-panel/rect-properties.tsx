@@ -1,5 +1,6 @@
 import { NumberInput } from "@/components/shared/number-input";
 import { Separator } from "@/components/ui/separator";
+import { getElementTransform } from "@/lib/element-utils";
 import { useCanvasStore } from "@/store";
 import type { RectElement } from "@/types";
 import { DimensionsSection } from "./dimensions-section";
@@ -7,7 +8,6 @@ import { ExportSection } from "./export-section";
 import { FillSection } from "./fill-section";
 import { RotateIcon, SectionHeader } from "./shared";
 import { StrokeSection } from "./stroke-section";
-import { getElementBounds } from "./utils";
 
 interface RectPropertiesProps {
   element: RectElement;
@@ -15,7 +15,7 @@ interface RectPropertiesProps {
 
 export function RectProperties({ element }: RectPropertiesProps) {
   const updateElement = useCanvasStore((s) => s.updateElement);
-  const bounds = getElementBounds(element);
+  const bounds = getElementTransform(element);
 
   return (
     <div className="flex h-full flex-col gap-0 text-foreground text-xs">
