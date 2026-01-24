@@ -183,7 +183,8 @@ export const createElementsSlice: StateCreator<ElementsSlice & StoreWithSelectio
 
     const updatedState = [...state.elements, ...newElements];
 
-    const elementsWithNonClonedParents = newElements.filter((e) => e.parentId && !idMap.has(e.parentId));
+    const newElementIds = new Set(newElements.map((e) => e.id));
+    const elementsWithNonClonedParents = newElements.filter((e) => e.parentId && !newElementIds.has(e.parentId));
 
     for (const newEl of elementsWithNonClonedParents) {
       const parentIdx = updatedState.findIndex((e) => e.id === newEl.parentId);
