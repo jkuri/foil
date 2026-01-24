@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,26 +5,15 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-function removeComments(code) {
-  // Remove single-line comments (// ...)
-  // But preserve URLs like http:// and https://
-  // And preserve biome-ignore comments
+function removeComments(code: string): string {
   code = code.replace(/(?<!:)\/\/(?!\/)(?!\s*biome-ignore)[^\n]*/g, "");
-
-  // Remove JSX comments {/* ... */} that are on their own line
   code = code.replace(/(^|\n)\s*\{\s*\/\*[\s\S]*?\*\/\s*\}[ \t]*(?=\r?\n|$)/g, "$1");
-
-  // Remove multi-line comments (/* ... */)
   code = code.replace(/\/\*[\s\S]*?\*\//g, "");
-
-  // Only remove excessive consecutive blank lines (more than 2)
-  // This keeps intentional spacing but removes gaps left by comment removal
   code = code.replace(/\n\n\n+/g, "\n\n");
-
   return code;
 }
 
-function findTsFiles(dir, fileList = []) {
+function findTsFiles(dir: string, fileList: string[] = []): string[] {
   const files = fs.readdirSync(dir);
 
   files.forEach((file) => {
@@ -45,13 +32,13 @@ function findTsFiles(dir, fileList = []) {
   return fileList;
 }
 
-const srcDir = path.join(__dirname, "..", "src");
-const files = findTsFiles(srcDir);
+const srcDir: string = path.join(__dirname, "..", "src");
+const files: string[] = findTsFiles(srcDir);
 
 console.log(`Found ${files.length} TypeScript/TSX files`);
 
-let processedCount = 0;
-let errorCount = 0;
+let processedCount: number = 0;
+let errorCount: number = 0;
 
 files.forEach((file) => {
   try {
@@ -65,7 +52,7 @@ files.forEach((file) => {
     }
   } catch (error) {
     errorCount++;
-    console.error(`✗ Error processing ${file}:`, error.message);
+    console.error(`✗ Error processing ${file}:`, (error as Error).message);
   }
 });
 
