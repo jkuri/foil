@@ -69,7 +69,7 @@ export function useResizeInteraction(
       };
 
       if (isSingleRotatedElement && selectedElements[0].type === "group" && bounds) {
-        const groupEntry: ElementData = {
+        const groupEntry = {
           rotation: selectedElements[0].rotation,
           type: "group",
           x: bounds.x,
@@ -77,7 +77,6 @@ export function useResizeInteraction(
           width: bounds.width,
           height: bounds.height,
           aspectRatioLocked: selectedElements[0].aspectRatioLocked,
-          childIds: (selectedElements[0] as GroupElement).childIds,
         };
         resizeStartRef.current.originalElements.set(selectedElements[0].id, groupEntry);
       }
@@ -154,7 +153,7 @@ export function useResizeInteraction(
           newWidth = Math.max(minSize, newWidth);
           newHeight = Math.max(minSize, newHeight);
 
-          const shouldMaintainRatio = original.type === "group" ? shiftKey : original.aspectRatioLocked || shiftKey;
+          const shouldMaintainRatio = original.aspectRatioLocked || shiftKey;
 
           if (shouldMaintainRatio) {
             const ratio = original.width / original.height;
@@ -203,10 +202,10 @@ export function useResizeInteraction(
 
           if (original.type === "group") {
             const startOBBResolved = {
-              x: original.x,
-              y: original.y,
-              width: original.width,
-              height: original.height,
+              x: original.x!,
+              y: original.y!,
+              width: original.width!,
+              height: original.height!,
               rotation: elementRotation,
             };
 
@@ -219,9 +218,18 @@ export function useResizeInteraction(
             };
 
             const updates = new Map<string, Record<string, unknown>>();
-            const groupElement = originalElements.get(id) as GroupElement;
+            const groupElement = getElementById(id) as GroupElement;
 
-            resizeGroupChildrenOBB(groupElement, startOBBResolved, endOBB, originalElements, updates);
+            const originalElementsMap = new Map<string, CanvasElement>();
+            for (const [elemId, elemData] of originalElements) {
+              const currentElem = getElementById(elemId);
+              if (currentElem) {
+                const originalElem = { ...currentElem, ...elemData } as CanvasElement;
+                originalElementsMap.set(elemId, originalElem);
+              }
+            }
+
+            resizeGroupChildrenOBB(groupElement, startOBBResolved, endOBB, originalElementsMap, updates);
 
             if (updates.size > 0) {
               useCanvasStore.getState().updateElements(updates);
