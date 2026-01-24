@@ -293,9 +293,8 @@ export function CanvasToolbar() {
 
   return (
     <>
-      {}
       <input ref={fileInputRef} type="file" accept=".svg,image/svg+xml" className="hidden" onChange={handleImportSVG} />
-      {}
+
       <input
         ref={jsonInputRef}
         type="file"
@@ -328,13 +327,11 @@ export function CanvasToolbar() {
         }}
       />
       <div className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border bg-background/80 p-1.5 shadow-2xl backdrop-blur-md">
-        {}
         <DropdownMenu>
           <DropdownMenuTrigger className="flex size-8 items-center justify-center rounded-md outline-none ring-offset-background transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
             <FoilLogo className="size-5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="top" sideOffset={10} className="w-56">
-            {}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>File</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
@@ -346,7 +343,6 @@ export function CanvasToolbar() {
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            {}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>Edit</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
@@ -370,7 +366,6 @@ export function CanvasToolbar() {
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            {}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>View</DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="w-48">
@@ -389,7 +384,6 @@ export function CanvasToolbar() {
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            {}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>Object</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
@@ -402,7 +396,6 @@ export function CanvasToolbar() {
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            {}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>Preferences</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
@@ -430,7 +423,6 @@ export function CanvasToolbar() {
 
         <Separator orientation="vertical" className="mx-1 h-6" />
 
-        {}
         <div className="flex items-center gap-0.5">
           {tools.map((tool) => (
             <Button
@@ -448,7 +440,6 @@ export function CanvasToolbar() {
 
         <Separator orientation="vertical" className="mx-1 h-6" />
 
-        {}
         <div className="flex items-center gap-0.5">
           {shapes.map((shape) => (
             <Button
@@ -466,7 +457,6 @@ export function CanvasToolbar() {
 
         <Separator orientation="vertical" className="mx-1 h-6" />
 
-        {}
         <div className="flex items-center gap-0.5">
           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={zoomOut} title="Zoom Out">
             <HugeiconsIcon icon={MinusSignIcon} size={16} />

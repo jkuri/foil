@@ -206,7 +206,6 @@ export function LayersPanel() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      {}
       <div className="flex h-10 items-center justify-between border-b bg-muted/30 px-3">
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={Layers01Icon} className="size-4" />
@@ -215,7 +214,6 @@ export function LayersPanel() {
         <span className="text-muted-foreground text-xs">{elements.length}</span>
       </div>
 
-      {}
       <div className="flex flex-1 flex-col overflow-hidden" ref={containerRef}>
         {flatItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground text-xs">

@@ -38,7 +38,6 @@ export function StrokeSection({ element, showMarkers = false }: StrokeSectionPro
 
       {element.stroke && (
         <div className="flex flex-col gap-3">
-          {}
           <div className="flex items-center gap-2">
             <ColorInput
               className="flex-1"
@@ -64,7 +63,6 @@ export function StrokeSection({ element, showMarkers = false }: StrokeSectionPro
             </Button>
           </div>
 
-          {}
           <div className="flex flex-col gap-1">
             <span className="font-medium text-[10px] text-muted-foreground uppercase">Weight</span>
             <NumberInput
@@ -79,7 +77,6 @@ export function StrokeSection({ element, showMarkers = false }: StrokeSectionPro
             />
           </div>
 
-          {}
           <Select
             value={
               element.stroke.dashArray?.length ? (element.stroke.dashArray[0] === 1 ? "dotted" : "dashed") : "solid"
@@ -105,7 +102,6 @@ export function StrokeSection({ element, showMarkers = false }: StrokeSectionPro
             </SelectContent>
           </Select>
 
-          {}
           {showMarkers && isLine && (
             <div className="mt-1 grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1">

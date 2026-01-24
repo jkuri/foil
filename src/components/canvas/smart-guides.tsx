@@ -12,7 +12,6 @@ export function SmartGuides() {
     <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
       <svg className="h-full w-full">
         <defs>
-          {}
           <pattern id="dash-pattern" patternUnits="userSpaceOnUse" width={8 / transform.scale} height={1}>
             <line
               x1="0"
@@ -65,9 +64,8 @@ export function SmartGuides() {
 
               return (
                 <g key={i}>
-                  {}
                   <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={GUIDE_COLOR} strokeWidth={strokeWidth} />
-                  {}
+
                   {isHorizontal ? (
                     <>
                       <line
@@ -107,7 +105,7 @@ export function SmartGuides() {
                       />
                     </>
                   )}
-                  {}
+
                   {guide.label && (
                     <foreignObject
                       x={cx - 20 / transform.scale}
@@ -150,7 +148,6 @@ export function SmartGuides() {
 
               return (
                 <g key={i}>
-                  {}
                   <polygon
                     points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
                     fill={GUIDE_COLOR}

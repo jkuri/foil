@@ -1,4 +1,5 @@
 import { NumberInput } from "@/components/shared/number-input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { FONT_FILES } from "@/lib/fonts";
@@ -24,11 +25,9 @@ export function TextProperties({ element }: TextPropertiesProps) {
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-2">
-        {}
         <div className="flex flex-col gap-2 p-3">
           <SectionHeader title="Typography" />
 
-          {}
           <Select
             value={element.fontFamily || "Inter"}
             onValueChange={async (newFontFamily) => {
@@ -96,7 +95,6 @@ export function TextProperties({ element }: TextPropertiesProps) {
             </SelectContent>
           </Select>
 
-          {}
           <div className="grid grid-cols-2 gap-1">
             <NumberInput
               value={element.fontSize || 16}
@@ -179,47 +177,36 @@ export function TextProperties({ element }: TextPropertiesProps) {
             </Select>
           </div>
 
-          {}
           <div className="flex gap-1">
-            <button
+            <Button
               type="button"
+              variant={element.textAnchor === "start" ? "default" : "outline"}
               onClick={() => updateElement(element.id, { textAnchor: "start" })}
-              className={`flex h-7 flex-1 items-center justify-center rounded border text-xs ${
-                (element.textAnchor || "start") === "start"
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-border hover:bg-muted"
-              }`}
+              className="flex-1"
             >
               Left
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant={element.textAnchor === "middle" ? "default" : "outline"}
               onClick={() => updateElement(element.id, { textAnchor: "middle" })}
-              className={`flex h-7 flex-1 items-center justify-center rounded border text-xs ${
-                (element.textAnchor || "start") === "middle"
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-border hover:bg-muted"
-              }`}
+              className="flex-1"
             >
               Center
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant={element.textAnchor === "end" ? "default" : "outline"}
               onClick={() => updateElement(element.id, { textAnchor: "end" })}
-              className={`flex h-7 flex-1 items-center justify-center rounded border text-xs ${
-                (element.textAnchor || "start") === "end"
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-border hover:bg-muted"
-              }`}
+              className="flex-1"
             >
               Right
-            </button>
+            </Button>
           </div>
         </div>
 
         <Separator />
 
-        {}
         <div className="flex flex-col gap-3 p-3">
           <SectionHeader title="Appearance" />
           <div className="flex flex-col gap-1">

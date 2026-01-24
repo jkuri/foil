@@ -163,7 +163,6 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
             </ContextMenuItem>
             <ContextMenuSeparator />
 
-            {}
             {selectedIds.length > 1 && (
               <ContextMenuItem onClick={groupSelected}>
                 Group Selection <ContextMenuShortcut>⌘G</ContextMenuShortcut>
@@ -176,7 +175,6 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
             )}
             {(selectedIds.length > 1 || isGroup) && <ContextMenuSeparator />}
 
-            {}
             {!isGroup && (
               <>
                 <ContextMenuSub>
@@ -202,7 +200,6 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
             </ContextMenuItem>
             <ContextMenuSeparator />
 
-            {}
             <ContextMenuSub>
               <ContextMenuSubTrigger>Export</ContextMenuSubTrigger>
               <ContextMenuSubContent>
@@ -213,7 +210,6 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
             </ContextMenuSub>
             <ContextMenuSeparator />
 
-            {}
             {contextMenuTarget.type === "text" && (
               <>
                 <ContextMenuItem

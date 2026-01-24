@@ -227,7 +227,6 @@ export const LayerItem = memo(
           }
         }}
       >
-        {}
         <div className="flex w-4 shrink-0 items-center justify-center">
           {isGroup && (
             <button
@@ -245,12 +244,10 @@ export const LayerItem = memo(
           )}
         </div>
 
-        {}
         <span className={cn("mr-2 shrink-0 opacity-70", isSelected && "opacity-100")}>
           {getTypeIcon(element.type, isExpanded)}
         </span>
 
-        {}
         {isEditing ? (
           <Input
             value={editName}
@@ -265,7 +262,6 @@ export const LayerItem = memo(
           <span className="flex-1 truncate font-medium text-xs">{element.name}</span>
         )}
 
-        {}
         <div
           className={cn("flex shrink-0 items-center gap-1 transition-opacity", !isSelected && "text-muted-foreground")}
           onMouseDown={(e) => e.stopPropagation()}
@@ -308,7 +304,6 @@ export const LayerItem = memo(
       <ContextMenu>
         <ContextMenuTrigger>{layerContent}</ContextMenuTrigger>
         <ContextMenuContent className="w-56">
-          {}
           <ContextMenuItem onClick={handleContextRename}>
             Rename
             <ContextMenuShortcut>Enter</ContextMenuShortcut>
@@ -316,7 +311,6 @@ export const LayerItem = memo(
 
           <ContextMenuSeparator />
 
-          {}
           <ContextMenuItem onClick={handleContextCopy}>
             Copy
             <ContextMenuShortcut>⌘C</ContextMenuShortcut>
@@ -332,7 +326,6 @@ export const LayerItem = memo(
 
           <ContextMenuSeparator />
 
-          {}
           <ContextMenuItem onClick={handleContextBringToFront}>
             Bring to Front
             <ContextMenuShortcut>⌘]</ContextMenuShortcut>
@@ -352,7 +345,6 @@ export const LayerItem = memo(
 
           <ContextMenuSeparator />
 
-          {}
           {isGroup ? (
             <ContextMenuItem onClick={handleContextUngroup}>
               Ungroup
@@ -367,13 +359,11 @@ export const LayerItem = memo(
 
           <ContextMenuSeparator />
 
-          {}
           <ContextMenuItem onClick={handleContextLock}>
             {isLocked ? "Unlock" : "Lock"}
             <ContextMenuShortcut>⌘⇧L</ContextMenuShortcut>
           </ContextMenuItem>
 
-          {}
           <ContextMenuItem onClick={handleContextVisibility}>
             {isVisible ? "Hide" : "Show"}
             <ContextMenuShortcut>⌘⇧H</ContextMenuShortcut>
@@ -392,7 +382,6 @@ export const LayerItem = memo(
 
           <ContextMenuSeparator />
 
-          {}
           <ContextMenuItem onClick={handleContextDelete} className="text-destructive focus:text-destructive">
             Delete
             <ContextMenuShortcut>⌫</ContextMenuShortcut>

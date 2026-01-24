@@ -226,7 +226,6 @@ export function ColorPicker({ color, onChange, className, opacity = 1, onOpacity
 
   return (
     <div className={cn("flex w-64 flex-col gap-3", className)}>
-      {}
       <div className="relative h-40 w-full overflow-hidden rounded-md border shadow-sm">
         <div
           ref={satRef}
@@ -247,11 +246,7 @@ export function ColorPicker({ color, onChange, className, opacity = 1, onOpacity
       </div>
 
       <div className="flex gap-3">
-        {}
-        {}
-
         <div className="flex flex-1 flex-col gap-3">
-          {}
           <div
             ref={hueRef}
             className="relative h-3 w-full cursor-pointer overflow-hidden rounded-full shadow-sm"
@@ -269,7 +264,6 @@ export function ColorPicker({ color, onChange, className, opacity = 1, onOpacity
             />
           </div>
 
-          {}
           <div
             ref={alphaRef}
             className="relative h-3 w-full cursor-pointer overflow-hidden rounded-full shadow-sm"
@@ -325,7 +319,6 @@ export function ColorPicker({ color, onChange, className, opacity = 1, onOpacity
         </div>
       </div>
 
-      {}
       <div className="grid grid-cols-8 gap-1 border-t pt-2">
         {COLOR_PICKER_PRESETS.map((c) => (
           <button

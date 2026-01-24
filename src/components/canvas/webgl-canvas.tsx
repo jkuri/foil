@@ -217,7 +217,6 @@ export function WebGLCanvas({ isReady = false }: WebGLCanvasProps) {
         <TextOverlay canvasRef={canvasRef.current} transform={transform} fontsReady={isReady} />
       </CanvasContextMenu>
 
-      {}
       {!isViewMode && (
         <>
           <TextEditor worldToScreen={worldToScreen} />
@@ -234,12 +233,10 @@ export function WebGLCanvas({ isReady = false }: WebGLCanvasProps) {
 
           <CanvasToolbar />
 
-          {}
           <Panel className="absolute top-0 bottom-0 left-0 border-r border-l-0">
             <LayersPanel />
           </Panel>
 
-          {}
           <Panel className="absolute top-0 right-0 border-r-0 border-l">
             <PropertiesPanel />
           </Panel>
