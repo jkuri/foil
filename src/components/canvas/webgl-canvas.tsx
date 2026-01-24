@@ -11,6 +11,7 @@ import { DimensionLabel } from "./dimension-label";
 import { ImageOverlay } from "./image-overlay";
 import { LayersPanel } from "./layers-panel";
 import { Panel } from "./panel";
+import { PathEditorOverlay } from "./path-editor-overlay";
 import { PropertiesPanel } from "./properties-panel";
 import { SmartGuides } from "./smart-guides";
 import { TextEditor } from "./text-editor";
@@ -213,6 +214,7 @@ export function WebGLCanvas({ isReady = false }: WebGLCanvasProps) {
       <CanvasContextMenu onContextMenu={handleContextMenu}>
         <canvas ref={canvasRef} className="h-full w-full" />
         <ImageOverlay canvasRef={canvasRef.current} transform={transform} />
+        <PathEditorOverlay screenToWorld={screenToWorld} worldToScreen={worldToScreen} />
         <TextOverlay canvasRef={canvasRef.current} transform={transform} fontsReady={isReady} />
       </CanvasContextMenu>
 

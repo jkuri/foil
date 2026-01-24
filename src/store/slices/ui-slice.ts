@@ -12,6 +12,11 @@ export interface UiSlice {
   smartGuides: SmartGuide[];
   isViewMode: boolean;
   isExporting: boolean;
+  editingPathId: string | null;
+  selectedPointIndices: number[];
+
+  setEditingPath: (id: string | null) => void;
+  setSelectedPointIndices: (indices: number[]) => void;
 
   setTransform: (transform: Partial<Transform>) => void;
   zoomIn: () => void;
@@ -41,6 +46,11 @@ export const createUiSlice: StateCreator<UiSlice & { elements: CanvasElement[] }
   smartGuides: [],
   isViewMode: false,
   isExporting: false,
+  editingPathId: null,
+  selectedPointIndices: [],
+
+  setEditingPath: (id: string | null) => set({ editingPathId: id }),
+  setSelectedPointIndices: (indices: number[]) => set({ selectedPointIndices: indices }),
 
   setTransform: (transform) => set((state) => ({ transform: { ...state.transform, ...transform } })),
 

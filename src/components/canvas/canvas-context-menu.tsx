@@ -43,6 +43,7 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
   const ungroupSelected = useCanvasStore((s) => s.ungroupSelected);
   const setViewMode = useCanvasStore((s) => s.setViewMode);
   const isViewMode = useCanvasStore((s) => s.isViewMode);
+  const setEditingPath = useCanvasStore((s) => s.setEditingPath);
 
   const handleColorChange = (color: string) => {
     if (contextMenuTarget) {
@@ -235,6 +236,13 @@ export function CanvasContextMenu({ children, onContextMenu }: CanvasContextMenu
                 >
                   Convert to Outlines
                 </ContextMenuItem>
+                <ContextMenuSeparator />
+              </>
+            )}
+
+            {contextMenuTarget.type === "path" && (
+              <>
+                <ContextMenuItem onClick={() => setEditingPath(contextMenuTarget.id)}>Edit Path</ContextMenuItem>
                 <ContextMenuSeparator />
               </>
             )}

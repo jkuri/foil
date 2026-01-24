@@ -63,6 +63,7 @@ export function useCanvasInteractions({
     setContextMenuTarget,
     setSelectionBox,
     getElementById,
+    editingPathId,
   } = useCanvasStore();
 
   const dragInteraction = useDragInteraction(screenToWorld, getElementById);
@@ -112,6 +113,11 @@ export function useCanvasInteractions({
         e.preventDefault();
         setIsPanning(true);
         handlers.startPan(e);
+        return;
+      }
+
+      if (editingPathId) {
+        useCanvasStore.getState().setEditingPath(null);
         return;
       }
 
