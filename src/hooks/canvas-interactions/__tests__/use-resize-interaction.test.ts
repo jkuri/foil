@@ -349,17 +349,17 @@ describe("getResizeHandle", () => {
     expect(result).toBe("se");
   });
 
-  it("should use hitTestBoundsHandle for group", () => {
+  it("should use hitTestRotatedElementHandle for group", () => {
     const rect = createRect();
     const group = createGroup([rect]);
     const elements = [rect, group];
     const getElementById = createGetElementById(elements);
-    const mockHitTestRotatedElement = vi.fn();
-    const mockHitTestBounds = vi.fn().mockReturnValue("nw");
+    const mockHitTestRotatedElement = vi.fn().mockReturnValue("nw");
+    const mockHitTestBounds = vi.fn();
 
     const result = getResizeHandle(0, 0, [group], 1, getElementById, mockHitTestRotatedElement, mockHitTestBounds);
 
-    expect(mockHitTestBounds).toHaveBeenCalled();
+    expect(mockHitTestRotatedElement).toHaveBeenCalled();
     expect(result).toBe("nw");
   });
 

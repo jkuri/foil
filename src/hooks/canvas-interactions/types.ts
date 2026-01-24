@@ -25,6 +25,7 @@ export interface ElementData {
   fontSize?: number;
   text?: string;
   points?: { x: number; y: number }[];
+  childIds?: string[];
 }
 
 export interface DragStartState {
@@ -70,6 +71,7 @@ export interface ResizeStartState {
   >;
   isSingleRotatedElement: boolean;
   elementRotation: number;
+  activeElementId?: string;
 }
 
 export interface RotateStartState {

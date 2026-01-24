@@ -252,7 +252,7 @@ export const resizeGroupChildrenOBB = (
   group: GroupElement,
   startOBB: { x: number; y: number; width: number; height: number; rotation: number },
   endOBB: { x: number; y: number; width: number; height: number; rotation: number },
-  elements: CanvasElement[],
+  originalElements: Map<string, CanvasElement>, // Use Map instead of array
   updates: Map<string, Record<string, unknown>>,
 ) => {
   const scaleX = endOBB.width / startOBB.width;
@@ -273,7 +273,7 @@ export const resizeGroupChildrenOBB = (
 
   const traverse = (ids: string[]) => {
     for (const id of ids) {
-      const el = elements.find((e) => e.id === id);
+      const el = originalElements.get(id); // Lookup in original map
       if (!el) continue;
 
       if (el.type === "group") {
@@ -314,7 +314,7 @@ export const resizeGroupChildrenOBB = (
         const newWidth = w * scaleX;
         const newHeight = h * scaleY;
 
-        const update: any = {
+        const update: Record<string, unknown> = {
           x: finalCx - newWidth / 2,
           y: finalCy - newHeight / 2,
         };

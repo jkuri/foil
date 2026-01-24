@@ -55,6 +55,16 @@ export function collectElementsForResize(
 ) {
   for (const element of els) {
     if (element.type === "group") {
+      const entry: ElementData = {
+        type: "group",
+        rotation: element.rotation,
+        childIds: element.childIds,
+        aspectRatioLocked: element.aspectRatioLocked,
+        // Group bounds are not strictly needed for children traversal,
+        // but can be added if available. For now, leave x/y undefined.
+      };
+      map.set(element.id, entry);
+
       const children = element.childIds.map((id) => getElementById(id)).filter(Boolean) as CanvasElement[];
       collectElementsForResize(children, map, getElementById);
     } else {

@@ -207,10 +207,10 @@ describe("collectElementsForResize", () => {
 
     collectElementsForResize([group], map, getElementById);
 
-    expect(map.size).toBe(2);
+    expect(map.size).toBe(3);
     expect(map.has(rect.id)).toBe(true);
     expect(map.has(ellipse.id)).toBe(true);
-    expect(map.has(group.id)).toBe(false);
+    expect(map.has(group.id)).toBe(true);
   });
 });
 

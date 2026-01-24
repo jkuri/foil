@@ -35,27 +35,15 @@ export function useResizeInteraction(
 
       if (isSingleRotatedElement) {
         if (selectedElements[0].type === "group") {
-          const flattened = flattenCanvasElements(selectedElements, getElementById);
-          const obb = calculateGroupOBB(flattened as Shape[], selectedElements[0].rotation);
-          // obb is {x, y, width, height, rotation} in world space (rotated)
-          // But we want "unrotated" bounds relative to the rotation?
-          // No, resizeStartRef stores "originalBounds".
-          // For rect, getElementBounds returns x,y,w,h (local).
-          // calculateGroupOBB returns x,y which are top-left of the rotated rect in world space?
-          // Wait, check calculateGroupOBB implementation.
-          // It returns x,y as center - width/2... rotated back?
-          // "worldCenterX - width / 2"
-          // Yes, it returns the OBB as a RectElement. x/y are the top-left corner of the unrotated box centered at the same spot.
+          // flattenedElements must include the group itself AND all its children (recursively)
+          // flattenCanvasElements returns children. We prepend the group.
+          const children = flattenCanvasElements(selectedElements, getElementById);
+          flattenedElements = [selectedElements[0], ...children];
+
+          // bounds logic remains same (only group matters for visual bounds start)
+          const obb = calculateGroupOBB(children as Shape[], selectedElements[0].rotation);
 
           bounds = { x: obb.x, y: obb.y, width: obb.width, height: obb.height };
-          // For group, "ElementData" needs x/y/w/h to be stored so we can use it in updateResize.
-          // But group element itself doesn't have x/y/w/h.
-          // We should fake it or store it separately?
-          // "collectElementsForResize" stores properties of the element.
-          // For group it will store empty?
-          flattenedElements = [selectedElements[0]];
-          // We need to ensure originalElements has this info.
-          // collectElementsForResize doesn't handle group "bounds" injection.
         } else {
           bounds = getElementBounds(selectedElements[0]);
           flattenedElements = [selectedElements[0]];
@@ -80,23 +68,26 @@ export function useResizeInteraction(
         originalElements: originalElements as ResizeStartState["originalElements"],
         isSingleRotatedElement,
         elementRotation,
+        activeElementId: isSingleRotatedElement ? selectedElements[0].id : undefined,
       };
 
       // Special case: Inject calculated bounds for Group into originalElements map
+      // Special case: Inject calculated bounds for Group into originalElements map
       // because Group element doesn't carry these itself.
       if (isSingleRotatedElement && selectedElements[0].type === "group" && bounds) {
-        const original = resizeStartRef.current.originalElements.get(selectedElements[0].id);
-        if (original) {
-          resizeStartRef.current.originalElements.set(selectedElements[0].id, {
-            ...original,
-            x: bounds.x,
-            y: bounds.y,
-            width: bounds.width,
-            height: bounds.height,
-            type: "group",
-            rotation: selectedElements[0].rotation,
-          } as ElementData);
-        }
+        // collectElementsForResize treats groups recursively and does not add the group container itself.
+        // We must ensure the group entry exists so updateResize can find it as the target.
+        const groupEntry: ElementData = {
+          rotation: selectedElements[0].rotation,
+          type: "group",
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: bounds.height,
+          aspectRatioLocked: selectedElements[0].aspectRatioLocked,
+          childIds: (selectedElements[0] as GroupElement).childIds,
+        };
+        resizeStartRef.current.originalElements.set(selectedElements[0].id, groupEntry);
       }
 
       return true;
@@ -122,8 +113,18 @@ export function useResizeInteraction(
       const deltaX = world.x - startX;
       const deltaY = world.y - startY;
 
-      if (isSingleRotatedElement && originalElements.size === 1) {
-        const [id, original] = [...originalElements.entries()][0];
+      const targetId = resizeStartRef.current.activeElementId;
+
+      // If we have a targetId, we use it. Otherwise fallback to size check (legacy/standard behavior)
+      const shouldResizeSingleRotated = isSingleRotatedElement && (targetId ? true : originalElements.size === 1);
+
+      if (shouldResizeSingleRotated) {
+        // If targetId is set, use it. Else assume only 1 element exists.
+        const [id, original] = targetId
+          ? [targetId, originalElements.get(targetId)!]
+          : [...originalElements.entries()][0];
+
+        if (!original) return; // Should not happen
 
         if (original.type === "rect" || original.type === "image" || original.type === "group") {
           const cos = Math.cos(elementRotation);
@@ -226,12 +227,14 @@ export function useResizeInteraction(
               height: newHeight,
               rotation: elementRotation,
             };
+            // We need all descendants to pass to resizeGroupChildrenOBB
+            // We can get them via flattenCanvasElements or just pass all elements and let it find by ID.
+            // CAUTION: We must pass originalElements (snapshot) to resizing func, otherwise it compounds!
 
-            const allElements = useCanvasStore.getState().elements;
             const updates = new Map<string, Record<string, unknown>>();
-            const groupElement = getElementById(id) as GroupElement;
+            const groupElement = originalElements.get(id) as GroupElement;
 
-            resizeGroupChildrenOBB(groupElement, startOBBResolved, endOBB, allElements, updates);
+            resizeGroupChildrenOBB(groupElement, startOBBResolved, endOBB, originalElements, updates);
 
             if (updates.size > 0) {
               useCanvasStore.getState().updateElements(updates);
