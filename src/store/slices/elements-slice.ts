@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 import { canvasHistory } from "@/lib/canvas-history";
 import type { CanvasElement, GroupElement, Transform } from "@/types";
-import { cloneElement, generateElementName, getDescendants, getElementIndex } from "../utils";
+import { cloneElement, generateCopyName, generateElementName, getDescendants, getElementIndex } from "../utils";
 
 export interface ElementsSlice {
   elements: CanvasElement[];
@@ -158,8 +158,12 @@ export const createElementsSlice: StateCreator<ElementsSlice & StoreWithSelectio
 
     for (const element of elementsToClone) {
       const newId = idMap.get(element.id)!;
+      const newName = generateCopyName(
+        element.name,
+        state.elements.map((e) => e.name),
+      );
 
-      const newElement = cloneElement(element, newId, 20);
+      const newElement = cloneElement(element, newId, 20, newName);
 
       if (newElement.parentId && idMap.has(newElement.parentId)) {
         newElement.parentId = idMap.get(newElement.parentId);

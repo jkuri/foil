@@ -23,8 +23,34 @@ export function generateElementName(type: CanvasElement["type"], elements: Canva
   return `${prefix} ${count}`;
 }
 
-export const cloneElement = (element: CanvasElement, newId: string, offset: number = 20): CanvasElement => {
-  const copy = { ...element, id: newId, name: `${element.name} Copy` };
+export function generateCopyName(originalName: string, existingNames: string[]): string {
+  const copyRegex = /^(.*?)\sCopy(?:\s(\d+))?$/;
+  const match = originalName.match(copyRegex);
+
+  let baseName = originalName;
+  if (match) {
+    baseName = match[1];
+  }
+
+  const isNameTaken = (name: string) => existingNames.includes(name);
+
+  let candidate = `${baseName} Copy`;
+  if (!isNameTaken(candidate)) {
+    return candidate;
+  }
+
+  let counter = 2;
+  while (true) {
+    candidate = `${baseName} Copy ${counter}`;
+    if (!isNameTaken(candidate)) {
+      return candidate;
+    }
+    counter++;
+  }
+}
+
+export const cloneElement = (element: CanvasElement, newId: string, offset: number = 20, name?: string): CanvasElement => {
+  const copy = { ...element, id: newId, name: name || `${element.name} Copy` };
 
   if (copy.type === "rect" || copy.type === "image" || copy.type === "text") {
     copy.x += offset;

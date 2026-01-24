@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { CanvasElement } from "@/types";
-import { cloneElement, getDescendants } from "../utils";
+import { cloneElement, generateCopyName, getDescendants } from "../utils";
 
 export interface SelectionSlice {
   selectedIds: string[];
@@ -75,8 +75,12 @@ export const createSelectionSlice: StateCreator<SelectionSlice & { elements: Can
 
     for (const element of state.clipboard) {
       const newId = idMap.get(element.id)!;
+      const newName = generateCopyName(
+        element.name,
+        state.elements.map((e) => e.name),
+      );
 
-      const newElement = cloneElement(element, newId, 20);
+      const newElement = cloneElement(element, newId, 20, newName);
 
       if (newElement.parentId && idMap.has(newElement.parentId)) {
         newElement.parentId = idMap.get(newElement.parentId);
