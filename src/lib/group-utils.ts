@@ -247,3 +247,119 @@ export const rotateGroupChildren = (
   traverse(element.childIds);
   return updates;
 };
+
+export const resizeGroupChildrenOBB = (
+  group: GroupElement,
+  startOBB: { x: number; y: number; width: number; height: number; rotation: number },
+  endOBB: { x: number; y: number; width: number; height: number; rotation: number },
+  elements: CanvasElement[],
+  updates: Map<string, Record<string, unknown>>,
+) => {
+  const scaleX = endOBB.width / startOBB.width;
+  const scaleY = endOBB.height / startOBB.height;
+
+  // Center of the group in world space
+  const startCenterX = startOBB.x + startOBB.width / 2;
+  const startCenterY = startOBB.y + startOBB.height / 2;
+
+  const endCenterX = endOBB.x + endOBB.width / 2;
+  const endCenterY = endOBB.y + endOBB.height / 2;
+
+  const cos = Math.cos(-startOBB.rotation);
+  const sin = Math.sin(-startOBB.rotation);
+
+  const cosEnd = Math.cos(endOBB.rotation);
+  const sinEnd = Math.sin(endOBB.rotation);
+
+  const traverse = (ids: string[]) => {
+    for (const id of ids) {
+      const el = elements.find((e) => e.id === id);
+      if (!el) continue;
+
+      if (el.type === "group") {
+        traverse(el.childIds);
+      } else if (el.type === "rect" || el.type === "image" || el.type === "text") {
+        let w = 0;
+        let h = 0;
+
+        if (el.type === "text" && el.bounds) {
+          w = el.bounds.width;
+          h = el.bounds.height;
+        } else {
+          // For text without bounds, we assume it's just a point for now or need better text resize logic
+          if (el.type !== "text") {
+            w = el.width;
+            h = el.height;
+          }
+        }
+
+        const elCx = el.x + w / 2;
+        const elCy = el.y + h / 2;
+
+        // Localize
+        const dx = elCx - startCenterX;
+        const dy = elCy - startCenterY;
+
+        const localX = dx * cos - dy * sin;
+        const localY = dx * sin + dy * cos;
+
+        // Scale
+        const scaledLocalX = localX * scaleX;
+        const scaledLocalY = localY * scaleY;
+
+        // World transform back
+        const finalCx = endCenterX + scaledLocalX * cosEnd - scaledLocalY * sinEnd;
+        const finalCy = endCenterY + scaledLocalX * sinEnd + scaledLocalY * cosEnd;
+
+        const newWidth = w * scaleX;
+        const newHeight = h * scaleY;
+
+        const update: any = {
+          x: finalCx - newWidth / 2,
+          y: finalCy - newHeight / 2,
+        };
+
+        if (el.type !== "text") {
+          update.width = newWidth;
+          update.height = newHeight;
+        } else {
+          update.fontSize = el.fontSize * ((scaleX + scaleY) / 2);
+        }
+
+        updates.set(id, update);
+      } else if (el.type === "path") {
+        // Simplified implementation for path: resize bounds and update d
+        // This assumes path is also rotated with group which generally fits
+        const b = el.bounds;
+        const elCx = b.x + b.width / 2;
+        const elCy = b.y + b.height / 2;
+
+        const dx = elCx - startCenterX;
+        const dy = elCy - startCenterY;
+        const localX = dx * cos - dy * sin;
+        const localY = dx * sin + dy * cos;
+
+        const scaledLocalX = localX * scaleX;
+        const scaledLocalY = localY * scaleY;
+
+        const finalCx = endCenterX + scaledLocalX * cosEnd - scaledLocalY * sinEnd;
+        const finalCy = endCenterY + scaledLocalX * sinEnd + scaledLocalY * cosEnd;
+
+        const finalW = b.width * scaleX;
+        const finalH = b.height * scaleY;
+
+        const newBounds = {
+          x: finalCx - finalW / 2,
+          y: finalCy - finalH / 2,
+          width: finalW,
+          height: finalH,
+        };
+
+        const newD = resizePath(el.d, b, newBounds);
+        updates.set(id, { d: newD, bounds: newBounds });
+      }
+      // TODO: Implement other types (ellipse, line, polygon) as needed
+    }
+  };
+  traverse(group.childIds);
+};

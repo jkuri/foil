@@ -1,10 +1,10 @@
 import { useCallback, useRef } from "react";
-import { calculateBoundingBox } from "@/core";
-import { resizeElementInGroup } from "@/lib/group-utils";
+import { calculateBoundingBox, calculateGroupOBB } from "@/core";
+import { resizeElementInGroup, resizeGroupChildrenOBB } from "@/lib/group-utils";
 import { resizePath } from "@/lib/svg-import";
 
 import { useCanvasStore } from "@/store";
-import type { BoundingBox, CanvasElement, ResizeHandle, Shape } from "@/types";
+import type { BoundingBox, CanvasElement, GroupElement, ResizeHandle, Shape } from "@/types";
 import { getElementBounds } from "@/types";
 import { collectElementsForResize, flattenCanvasElements } from "./element-helpers";
 import type { ElementData, ResizeStartState } from "./types";
@@ -25,16 +25,41 @@ export function useResizeInteraction(
     ) => {
       const isSingleRotatedElement =
         selectedElements.length === 1 &&
-        (selectedElements[0].rotation !== 0 || selectedElements[0].type === "line") &&
-        selectedElements[0].type !== "group";
+        (selectedElements[0].rotation !== 0 ||
+          selectedElements[0].type === "line" ||
+          selectedElements[0].type === "group");
       const elementRotation = isSingleRotatedElement ? selectedElements[0].rotation : 0;
 
       let bounds: BoundingBox | null;
       let flattenedElements: CanvasElement[] = [];
 
       if (isSingleRotatedElement) {
-        bounds = getElementBounds(selectedElements[0]);
-        flattenedElements = [selectedElements[0]];
+        if (selectedElements[0].type === "group") {
+          const flattened = flattenCanvasElements(selectedElements, getElementById);
+          const obb = calculateGroupOBB(flattened as Shape[], selectedElements[0].rotation);
+          // obb is {x, y, width, height, rotation} in world space (rotated)
+          // But we want "unrotated" bounds relative to the rotation?
+          // No, resizeStartRef stores "originalBounds".
+          // For rect, getElementBounds returns x,y,w,h (local).
+          // calculateGroupOBB returns x,y which are top-left of the rotated rect in world space?
+          // Wait, check calculateGroupOBB implementation.
+          // It returns x,y as center - width/2... rotated back?
+          // "worldCenterX - width / 2"
+          // Yes, it returns the OBB as a RectElement. x/y are the top-left corner of the unrotated box centered at the same spot.
+
+          bounds = { x: obb.x, y: obb.y, width: obb.width, height: obb.height };
+          // For group, "ElementData" needs x/y/w/h to be stored so we can use it in updateResize.
+          // But group element itself doesn't have x/y/w/h.
+          // We should fake it or store it separately?
+          // "collectElementsForResize" stores properties of the element.
+          // For group it will store empty?
+          flattenedElements = [selectedElements[0]];
+          // We need to ensure originalElements has this info.
+          // collectElementsForResize doesn't handle group "bounds" injection.
+        } else {
+          bounds = getElementBounds(selectedElements[0]);
+          flattenedElements = [selectedElements[0]];
+        }
       } else {
         flattenedElements = flattenCanvasElements(selectedElements, getElementById);
         bounds = calculateBoundingBox(flattenedElements);
@@ -56,6 +81,23 @@ export function useResizeInteraction(
         isSingleRotatedElement,
         elementRotation,
       };
+
+      // Special case: Inject calculated bounds for Group into originalElements map
+      // because Group element doesn't carry these itself.
+      if (isSingleRotatedElement && selectedElements[0].type === "group" && bounds) {
+        const original = resizeStartRef.current.originalElements.get(selectedElements[0].id);
+        if (original) {
+          resizeStartRef.current.originalElements.set(selectedElements[0].id, {
+            ...original,
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
+            type: "group",
+            rotation: selectedElements[0].rotation,
+          } as ElementData);
+        }
+      }
 
       return true;
     },
@@ -83,7 +125,7 @@ export function useResizeInteraction(
       if (isSingleRotatedElement && originalElements.size === 1) {
         const [id, original] = [...originalElements.entries()][0];
 
-        if (original.type === "rect" || original.type === "image") {
+        if (original.type === "rect" || original.type === "image" || original.type === "group") {
           const cos = Math.cos(elementRotation);
           const sin = Math.sin(elementRotation);
           const cosNeg = Math.cos(-elementRotation);
@@ -121,7 +163,7 @@ export function useResizeInteraction(
           newWidth = Math.max(minSize, newWidth);
           newHeight = Math.max(minSize, newHeight);
 
-          const shouldMaintainRatio = original.aspectRatioLocked || shiftKey;
+          const shouldMaintainRatio = original.type === "group" ? shiftKey : original.aspectRatioLocked || shiftKey;
 
           if (shouldMaintainRatio) {
             const ratio = original.width / original.height;
@@ -168,12 +210,40 @@ export function useResizeInteraction(
           const finalX = newCenterWorldX - newWidth / 2;
           const finalY = newCenterWorldY - newHeight / 2;
 
-          useCanvasStore.getState().updateElement(id, {
-            x: finalX,
-            y: finalY,
-            width: newWidth,
-            height: newHeight,
-          });
+          if (original.type === "group") {
+            const startOBBResolved = {
+              x: original.x,
+              y: original.y,
+              width: original.width,
+              height: original.height,
+              rotation: elementRotation,
+            };
+
+            const endOBB = {
+              x: finalX,
+              y: finalY,
+              width: newWidth,
+              height: newHeight,
+              rotation: elementRotation,
+            };
+
+            const allElements = useCanvasStore.getState().elements;
+            const updates = new Map<string, Record<string, unknown>>();
+            const groupElement = getElementById(id) as GroupElement;
+
+            resizeGroupChildrenOBB(groupElement, startOBBResolved, endOBB, allElements, updates);
+
+            if (updates.size > 0) {
+              useCanvasStore.getState().updateElements(updates);
+            }
+          } else {
+            useCanvasStore.getState().updateElement(id, {
+              x: finalX,
+              y: finalY,
+              width: newWidth,
+              height: newHeight,
+            });
+          }
         } else if (original.type === "line") {
           const currentX1 = original.x1 ?? 0;
           const currentY1 = original.y1 ?? 0;
@@ -370,7 +440,12 @@ export function getResizeHandle(
 ): ResizeHandle {
   if (selectedElements.length === 1 && selectedElements[0].type !== "group" && selectedElements[0].type !== "text") {
     return hitTestRotatedElementHandle(worldX, worldY, selectedElements[0] as Shape, scale);
-  } else if (selectedElements.length > 1 || (selectedElements.length === 1 && selectedElements[0].type === "group")) {
+  } else if (selectedElements.length === 1 && selectedElements[0].type === "group") {
+    const group = selectedElements[0] as unknown as CanvasElement;
+    const flattenedElements = flattenCanvasElements([group], getElementById);
+    const obb = calculateGroupOBB(flattenedElements as Shape[], group.rotation);
+    return hitTestRotatedElementHandle(worldX, worldY, obb, scale);
+  } else if (selectedElements.length > 1) {
     const flattened = flattenCanvasElements(selectedElements, getElementById);
     const bounds = calculateBoundingBox(flattened);
     if (bounds) {
